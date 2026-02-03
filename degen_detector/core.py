@@ -43,13 +43,19 @@ class DegenDetector:
         self.param_names = list(param_names)
 
     def analyze_multi(self, mi_threshold=0.1, min_group_size=2,
-                      max_group_size=5, max_complexity=25, niterations=60):
+                      max_group_size=5, max_complexity=25, niterations=60,
+                      batching=False):
         """Run the full degeneracy detection pipeline.
 
         Steps:
         1. Compute mutual information matrix
         2. Discover degenerate groups
         3. Fit symbolic equations for each group
+
+        Parameters
+        ----------
+        batching : bool, default=False
+            Enable batching for large datasets (>10,000 points).
         """
         # Step 1: MI matrix
         mi_result = mutual_info_matrix(self.samples, self.param_names)
@@ -70,6 +76,7 @@ class DegenDetector:
                 group, self.samples, self.param_names,
                 max_complexity=max_complexity,
                 niterations=niterations,
+                batching=batching,
             )
             if fit is not None:
                 degeneracies.append(MultiDegeneracy(

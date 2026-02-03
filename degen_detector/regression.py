@@ -19,7 +19,7 @@ class MultiSymbolicFit:
     target_name: str
 
 
-def _make_pysr_model(max_complexity=25, niterations=60):
+def _make_pysr_model(max_complexity=25, niterations=60, batching=False):
     """Create a PySR model with the standard configuration."""
     return PySRRegressor(
         binary_operators=["+", "-", "*", "/", "^"],
@@ -31,6 +31,7 @@ def _make_pysr_model(max_complexity=25, niterations=60):
         parallelism="serial",
         populations=15,
         progress=False,
+        batching=batching,
     )
 
 
@@ -54,12 +55,17 @@ def _build_predict(sympy_expr, input_names):
 
 
 def fit_group_all_targets(group, samples, param_names,
-                          max_complexity=25, niterations=60):
+                          max_complexity=25, niterations=60, batching=False):
     """Try each parameter as target, return the fit with highest R².
 
     For a group of k parameters, runs k separate PySR fits. Each fit
     uses k-1 parameters as inputs and 1 as the target. Returns the
     combination that yields the highest R².
+
+    Parameters
+    ----------
+    batching : bool, default=False
+        Enable batching for large datasets (>10,000 points).
     """
     best_fit = None
     best_r2 = -np.inf
@@ -71,7 +77,7 @@ def fit_group_all_targets(group, samples, param_names,
         input_names = [param_names[j] for j in input_indices]
         target_name = param_names[target_idx]
 
-        model = _make_pysr_model(max_complexity, niterations)
+        model = _make_pysr_model(max_complexity, niterations, batching)
         model.fit(X, y, variable_names=input_names)
 
         eq = _select_equation(model.equations_)
