@@ -1,4 +1,7 @@
-from degen_detector.core import DegenDetector, MultiDegenResults, MultiDegeneracy
-from degen_detector.analysis import MIResult, mutual_info_matrix, local_pca_intrinsic_dim
-from degen_detector.groups import DegeneracyGroup, GroupingResult, find_degenerate_groups
-from degen_detector.regression import MultiSymbolicFit, fit_group_all_targets
+# ABOUTME: Public API exports for degen_detector package.
+
+from degen_detector.core import DegenDetector, CouplingFit, CouplingSearchResult
+from degen_detector.analysis import MIResult, mutual_info_matrix, select_params_by_mi
+from degen_detector.groups import RankedTuple, generate_ranked_tuples
+from degen_detector.regression import MultiSymbolicFit, fit_tuple
+from degen_detector.plotting import plot_corner_with_degeneracy, plot_residual_corner

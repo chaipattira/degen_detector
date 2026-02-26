@@ -1,7 +1,8 @@
-# ABOUTME: Fits symbolic equations to degenerate parameter groups using genetic programming.
+# ABOUTME: Fits symbolic equations to parameter tuples using genetic programming.
 # ABOUTME: Wraps PySR to find human-readable relationships like sigma8 = f(Om).
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import sympy
@@ -19,9 +20,9 @@ class MultiSymbolicFit:
     target_name: str
 
 
-def _make_pysr_model(max_complexity=25, niterations=60, batching=False):
+def _make_pysr_model(max_complexity=25, niterations=60, batching=False, tempdir=None):
     """Create a PySR model with the standard configuration."""
-    return PySRRegressor(
+    kwargs = dict(
         binary_operators=["+", "-", "*", "/", "^"],
         unary_operators=["sqrt", "log", "exp"],
         constraints={"^": (-1, 1), "/": (-1, 9)},
@@ -33,6 +34,10 @@ def _make_pysr_model(max_complexity=25, niterations=60, batching=False):
         progress=False,
         batching=batching,
     )
+    if tempdir is not None:
+        kwargs["tempdir"] = str(tempdir)
+        kwargs["temp_equation_file"] = True
+    return PySRRegressor(**kwargs)
 
 
 def _select_equation(equations_df):
@@ -54,53 +59,81 @@ def _build_predict(sympy_expr, input_names):
     return predict
 
 
-def fit_group_all_targets(group, samples, param_names,
-                          max_complexity=25, niterations=60, batching=False):
-    """Try each parameter as target, return the fit with highest R².
+def fit_tuple(samples, param_names, param_indices,
+              max_complexity=25, niterations=60, batching=False, output_dir=None):
+    """Fit symbolic equation for a specific parameter tuple.
 
-    For a group of k parameters, runs k separate PySR fits. Each fit
-    uses k-1 parameters as inputs and 1 as the target. Returns the
-    combination that yields the highest R².
+    Tries each parameter as target, returns the fit with highest R².
 
     Parameters
     ----------
-    batching : bool, default=False
-        Enable batching for large datasets (>10,000 points).
+    samples : ndarray
+        Full samples array (N, M).
+    param_names : list[str]
+        All parameter names.
+    param_indices : list[int]
+        Indices of parameters in this tuple.
+    max_complexity : int
+        Maximum equation complexity (PySR maxsize).
+    niterations : int
+        Number of PySR evolution iterations.
+    batching : bool
+        Enable batching for large datasets.
+    output_dir : str or Path, optional
+        Base directory for PySR temp files. Subfolder names are based on
+        the parameter tuple being fit.
+
+    Returns
+    -------
+    fit : MultiSymbolicFit or None
+        Best fit (highest R²), or None if all fits fail.
     """
     best_fit = None
     best_r2 = -np.inf
 
-    for target_idx in group.param_indices:
-        input_indices = [j for j in group.param_indices if j != target_idx]
+    # Build tuple name for output folder
+    tuple_names = [param_names[j] for j in param_indices]
+    tuple_label = "_".join(tuple_names)
+
+    for target_idx in param_indices:
+        input_indices = [j for j in param_indices if j != target_idx]
         X = samples[:, input_indices]
         y = samples[:, target_idx]
-        input_names = [param_names[j] for j in input_indices]
+        input_names_local = [param_names[j] for j in input_indices]
         target_name = param_names[target_idx]
 
-        model = _make_pysr_model(max_complexity, niterations, batching)
-        model.fit(X, y, variable_names=input_names)
+        # Create descriptive subfolder for this fit
+        tempdir = None
+        if output_dir is not None:
+            tempdir = Path(output_dir) / f"{tuple_label}_target_{target_name}"
+            tempdir.mkdir(parents=True, exist_ok=True)
 
-        eq = _select_equation(model.equations_)
+        try:
+            model = _make_pysr_model(max_complexity, niterations, batching, tempdir)
+            model.fit(X, y, variable_names=input_names_local)
 
-        # Build predict from sympy (safer than lambda_format)
-        predict_fn = _build_predict(eq["sympy_format"], input_names)
+            eq = _select_equation(model.equations_)
+            predict_fn = _build_predict(eq["sympy_format"], input_names_local)
 
-        # Compute R²
-        y_pred = predict_fn(X)
-        ss_res = np.sum((y - y_pred) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
-        r2 = 1 - ss_res / ss_tot
+            # Compute R²
+            y_pred = predict_fn(X)
+            ss_res = np.sum((y - y_pred) ** 2)
+            ss_tot = np.sum((y - np.mean(y)) ** 2)
+            r2 = 1 - ss_res / ss_tot
 
-        if r2 > best_r2:
-            best_r2 = r2
-            equation_str = f"{target_name} = {eq['equation']}"
-            best_fit = MultiSymbolicFit(
-                equation_str=equation_str,
-                r_squared=r2,
-                complexity=int(eq["complexity"]),
-                predict=predict_fn,
-                input_names=input_names,
-                target_name=target_name,
-            )
+            if r2 > best_r2:
+                best_r2 = r2
+                equation_str = f"{target_name} = {eq['equation']}"
+                best_fit = MultiSymbolicFit(
+                    equation_str=equation_str,
+                    r_squared=r2,
+                    complexity=int(eq["complexity"]),
+                    predict=predict_fn,
+                    input_names=input_names_local,
+                    target_name=target_name,
+                )
+        except Exception:
+            # Skip failed fits
+            continue
 
     return best_fit

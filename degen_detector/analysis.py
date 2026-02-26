@@ -65,3 +65,30 @@ def local_pca_intrinsic_dim(samples, variance_threshold=0.95):
     intrinsic_dim = int(np.searchsorted(cumvar, variance_threshold) + 1)
 
     return intrinsic_dim
+
+
+def select_params_by_mi(mi_result, top_n):
+    """Select top-N parameters by total mutual information.
+
+    Parameters with highest sum of MI to all other parameters are selected,
+    i.e., those most correlated with the rest of the parameter space.
+
+    Parameters
+    ----------
+    mi_result : MIResult
+        Precomputed mutual information matrix.
+    top_n : int
+        Number of parameters to select.
+
+    Returns
+    -------
+    selected_indices : list[int]
+        Indices of selected parameters (sorted ascending).
+    selected_names : list[str]
+        Names of selected parameters.
+    """
+    total_mi = mi_result.mi_matrix.sum(axis=1)
+    top_indices = np.argsort(total_mi)[::-1][:top_n].tolist()
+    top_indices.sort()  # Keep original order for consistency
+    selected_names = [mi_result.param_names[i] for i in top_indices]
+    return top_indices, selected_names

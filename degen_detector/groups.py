@@ -1,127 +1,109 @@
-# ABOUTME: Discovers groups of degenerate parameters from mutual information structure.
-# ABOUTME: Uses graph-based connected components with validation and constraint counting.
+# ABOUTME: Generates and ranks parameter tuples for degeneracy search.
+# ABOUTME: Replaces graph-based group discovery with user-controlled tuple enumeration.
 
-from collections import deque
 from dataclasses import dataclass
+from itertools import combinations
 
 import numpy as np
 
-from degen_detector.analysis import MIResult, local_pca_intrinsic_dim
+from degen_detector.analysis import MIResult
 
 
 @dataclass
-class DegeneracyGroup:
-    """A group of jointly degenerate parameters."""
-    param_names: list
+class RankedTuple:
+    """A parameter tuple with its MI-based ranking score."""
     param_indices: list
-    n_constraints: int
-    avg_mi: float
+    param_names: list
+    mi_score: float
+    pairwise_mi: dict  # {(i, j): mi_value} for inspection
 
 
-@dataclass
-class GroupingResult:
-    """All discovered degenerate groups plus the MI matrix used."""
-    groups: list  # list[DegeneracyGroup]
-    mi_result: MIResult
+def compute_tuple_mi_score(indices, mi_matrix, method="min"):
+    """Compute MI score for a parameter tuple.
 
+    Parameters
+    ----------
+    indices : list[int]
+        Parameter indices in the tuple.
+    mi_matrix : ndarray
+        Mutual information matrix.
+    method : str
+        Aggregation method:
+        - "min": minimum pairwise MI (conservative; all pairs must be coupled)
+        - "avg": average pairwise MI
+        - "sum": sum of all pairwise MI
+        - "geometric": geometric mean of pairwise MI
 
-def _bfs(start, adjacency):
-    """Return the connected component containing start."""
-    visited = {start}
-    queue = deque([start])
-    while queue:
-        node = queue.popleft()
-        for neighbor in adjacency.get(node, set()):
-            if neighbor not in visited:
-                visited.add(neighbor)
-                queue.append(neighbor)
-    return visited
-
-
-def find_degenerate_groups(mi_result, mi_threshold=0.1, min_group_size=2,
-                           max_group_size=5, samples=None):
-    """Identify groups of degenerate parameters from an MI matrix.
-
-    Steps:
-    1. Build adjacency graph from MI threshold
-    2. Find connected components via BFS
-    3. Validate: remove params with weak connections
-    4. Cap group sizes
-    5. Filter small groups
-    6. Count constraints via local PCA (if samples provided)
+    Returns
+    -------
+    score : float
+        Aggregated MI score.
+    pairwise_mi : dict
+        Individual pairwise MI values.
     """
-    mi = mi_result.mi_matrix
-    n_params = len(mi_result.param_names)
+    pairs = list(combinations(indices, 2))
+    pairwise_mi = {(i, j): mi_matrix[i, j] for i, j in pairs}
+    values = list(pairwise_mi.values())
 
-    # 1. Build adjacency
-    adjacency = {i: set() for i in range(n_params)}
-    for i in range(n_params):
-        for j in range(i + 1, n_params):
-            if mi[i, j] > mi_threshold:
-                adjacency[i].add(j)
-                adjacency[j].add(i)
+    if not values:
+        return 0.0, pairwise_mi
 
-    # 2. BFS connected components
-    visited = set()
-    components = []
-    for node in range(n_params):
-        if node not in visited:
-            component = _bfs(node, adjacency)
-            visited.update(component)
-            components.append(component)
+    if method == "min":
+        score = min(values)
+    elif method == "avg":
+        score = float(np.mean(values))
+    elif method == "sum":
+        score = sum(values)
+    elif method == "geometric":
+        # Geometric mean; add epsilon to avoid log(0)
+        score = float(np.exp(np.mean(np.log(np.array(values) + 1e-10))))
+    else:
+        raise ValueError(f"Unknown MI ranking method: {method}")
 
-    # 3. Validate: remove params where max MI to others in group < threshold
-    validated = []
-    for comp in components:
-        kept = set()
-        for p in comp:
-            others = comp - {p}
-            if others:
-                max_mi = max(mi[p, q] for q in others)
-                if max_mi > mi_threshold:
-                    kept.add(p)
-        validated.append(kept)
+    return score, pairwise_mi
 
-    # 4. Cap group sizes
-    capped = []
-    for comp in validated:
-        if len(comp) > max_group_size:
-            # Keep params with highest total MI within the group
-            total_mi = {
-                p: sum(mi[p, q] for q in comp if q != p) for p in comp
-            }
-            sorted_params = sorted(total_mi, key=total_mi.get, reverse=True)
-            comp = set(sorted_params[:max_group_size])
-        capped.append(comp)
 
-    # 5. Filter small groups
-    filtered = [comp for comp in capped if len(comp) >= min_group_size]
+def generate_ranked_tuples(mi_result, param_indices, coupling_depth,
+                           mi_rank_method="min"):
+    """Generate all k-tuples and rank by MI score descending.
 
-    # 6. Build DegeneracyGroup objects
-    groups = []
-    for comp in filtered:
-        indices = sorted(comp)
-        names = [mi_result.param_names[i] for i in indices]
+    Parameters
+    ----------
+    mi_result : MIResult
+        Precomputed mutual information matrix.
+    param_indices : list[int]
+        Which parameter indices to consider.
+    coupling_depth : int
+        Size of tuples (k). Must be >= 2.
+    mi_rank_method : str
+        Method to aggregate pairwise MI into tuple score.
 
-        # Constraint counting
-        n_constraints = 0
-        if samples is not None:
-            group_samples = samples[:, indices]
-            intrinsic_dim = local_pca_intrinsic_dim(group_samples)
-            n_constraints = len(indices) - intrinsic_dim
+    Returns
+    -------
+    ranked_tuples : list[RankedTuple]
+        All C(N,k) tuples, sorted by mi_score descending.
+    """
+    if coupling_depth < 2:
+        raise ValueError("coupling_depth must be >= 2")
+    if coupling_depth > len(param_indices):
+        raise ValueError(
+            f"coupling_depth ({coupling_depth}) cannot exceed "
+            f"number of parameters ({len(param_indices)})"
+        )
 
-        # Average MI: mean of all unique pairwise MI values in the group
-        mi_values = []
-        for i_idx, i in enumerate(indices):
-            for j in indices[i_idx + 1:]:
-                mi_values.append(mi[i, j])
-        avg_mi = float(np.mean(mi_values)) if mi_values else 0.0
-
-        groups.append(DegeneracyGroup(
-            param_names=names,
-            param_indices=indices,
-            n_constraints=n_constraints,
-            avg_mi=avg_mi,
+    tuples = []
+    for indices in combinations(param_indices, coupling_depth):
+        indices_list = list(indices)
+        score, pairwise = compute_tuple_mi_score(
+            indices_list, mi_result.mi_matrix, mi_rank_method
+        )
+        tuples.append(RankedTuple(
+            param_indices=indices_list,
+            param_names=[mi_result.param_names[i] for i in indices_list],
+            mi_score=score,
+            pairwise_mi=pairwise,
         ))
 
-    return GroupingResult(groups=groups, mi_result=mi_result)
+    # Sort descending by MI score (highest = most likely degenerate)
+    tuples.sort(key=lambda t: t.mi_score, reverse=True)
+    return tuples
