@@ -24,8 +24,8 @@ def _make_pysr_model(max_complexity=25, niterations=60, batching=False, tempdir=
     """Create a PySR model with the standard configuration."""
     kwargs = dict(
         binary_operators=["+", "-", "*", "/", "^"],
-        unary_operators=["sqrt", "log", "exp"],
-        constraints={"^": (-1, 1), "/": (-1, 9)},
+        unary_operators=["sqrt", "log", "exp", "sin", "cos"],
+        constraints={"^": (-1, 3), "/": (-1, 9)},
         maxsize=max_complexity,
         niterations=niterations,
         deterministic=True,
@@ -41,9 +41,22 @@ def _make_pysr_model(max_complexity=25, niterations=60, batching=False, tempdir=
 
 
 def _select_equation(equations_df):
-    """Select the simplest equation within 1.5x of the best loss."""
+    """Select equation balancing loss and complexity."""
     min_loss = equations_df["loss"].min()
-    candidates = equations_df[equations_df["loss"] < min_loss * 1.5]
+
+    # Adaptive threshold: stricter when best equation is a constant
+    best_row = equations_df.loc[equations_df["loss"].idxmin()]
+    if best_row["complexity"] <= 1:
+        # Best is a constant - require tighter tolerance
+        threshold = 1.05
+    else:
+        # Best is complex - allow standard tolerance
+        threshold = 1.5
+
+    candidates = equations_df[equations_df["loss"] < min_loss * threshold]
+    if len(candidates) == 0:
+        candidates = equations_df  # Fallback if no candidates
+
     best_idx = candidates["complexity"].idxmin()
     return equations_df.loc[best_idx]
 
@@ -54,8 +67,13 @@ def _build_predict(sympy_expr, input_names):
     fn = sympy.lambdify(symbols, sympy_expr, modules=["numpy"])
 
     def predict(X):
-        return np.asarray(fn(*[X[:, i] for i in range(X.shape[1])]),
-                          dtype=float)
+        result = np.asarray(fn(*[X[:, i] for i in range(X.shape[1])]),
+                           dtype=float)
+        # Ensure result is always an array matching input size
+        # (handles constant equations that return scalars)
+        if result.ndim == 0:
+            result = np.full(X.shape[0], result)
+        return result
     return predict
 
 

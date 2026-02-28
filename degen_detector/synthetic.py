@@ -46,29 +46,32 @@ def generate_3param_exp_log(n=2000, noise=0.1, seed=42):
     return samples, ["x", "y", "z", "a", "b", "c", "d"]
 
 
-def load_sbibm_slcp(num_observation=1):
-    """Load SLCP reference posterior from SBIBM.
+def generate_s_curve(n=2000, noise=0.1, seed=42):
+    """Generate S-curve manifold with degeneracy in 3D space.
 
-    SLCP (Simple Likelihood Complex Posterior) has 5 parameters with
-    complex nonlinear correlations. No known analytical ground truth -
-    useful for testing the detector on realistic SBI posteriors.
+    The S-curve is a 2D manifold embedded in 3D space where the 3 coordinates
+    (x, y, z) are related through the manifold structure, creating a clear
+    multi-dimensional degeneracy.
 
     Parameters
     ----------
-    num_observation : int
-        Which observation to use (1-10 available in SBIBM).
+    n : int
+        Number of samples to generate.
+    noise : float
+        Standard deviation of Gaussian noise added to the S-curve.
+    seed : int
+        Random seed for reproducibility.
 
     Returns
     -------
     samples : ndarray
-        Reference posterior samples (10000, 5).
+        S-curve samples (n, 3) representing [x, y, z] coordinates.
     names : list[str]
-        Parameter names ["theta_0", "theta_1", ..., "theta_4"].
+        Parameter names ["x", "y", "z"].
     """
-    import sbibm
+    from sklearn.datasets import make_s_curve
 
-    task = sbibm.get_task("slcp")
-    samples = task.get_reference_posterior_samples(num_observation=num_observation)
-    samples = samples.numpy()
-    names = [f"theta_{i}" for i in range(5)]
+    # Generate S-curve
+    samples, t = make_s_curve(n_samples=n, noise=noise, random_state=seed)
+    names = ["x", "y", "z"]
     return samples, names

@@ -2,7 +2,7 @@
 """Run synthetic degeneracy experiments and save results for plotting.
 
 Usage:
-    python scripts/run_synthetic_experiments.py [--output-dir DIR]
+    python /home/x-ctirapongpra/scratch/degen_detector/scripts/run_synthetic_experiments.py --experiments exp3
 
 Results are saved as pickle files that can be loaded by notebooks for plotting.
 """
@@ -22,7 +22,7 @@ from degen_detector import DegenDetector
 from degen_detector.synthetic import (
     generate_3param_polynomial,
     generate_3param_exp_log,
-    load_sbibm_slcp,
+    generate_s_curve,
 )
 
 
@@ -34,7 +34,6 @@ EXPERIMENTS = [
         "ground_truth": "z = x² + y",
         "coupling_depth": 3,
         "niterations": 40,
-        "is_sbibm": False,
     },
     {
         "name": "exp2_exp_log",
@@ -43,17 +42,14 @@ EXPERIMENTS = [
         "ground_truth": "z = exp(x) + log(y)",
         "coupling_depth": 3,
         "niterations": 40,
-        "is_sbibm": False,
     },
     {
-        "name": "exp3_sbibm_slcp",
-        "generator": load_sbibm_slcp,
-        "params": None,  # Use all 5 parameters
-        "ground_truth": "Unknown (SBIBM SLCP benchmark)",
-        "coupling_depth": 2,  # Start with pairs
-        "niterations": 100,
-        "is_sbibm": True,
-        "batching": True,  # Use batching for large dataset (10k samples)
+        "name": "exp3_s_curve",
+        "generator": generate_s_curve,
+        "params": ["x", "y", "z"],
+        "ground_truth": "S-curve manifold",
+        "coupling_depth": 2,
+        "niterations": 800,
     },
 ]
 
@@ -65,11 +61,8 @@ def run_experiment(exp_config, output_dir, n_samples=2000, noise=0.3):
     print(f"Ground truth: {exp_config['ground_truth']}")
     print(f"{'='*60}")
 
-    # Generate or load data
-    if exp_config.get("is_sbibm", False):
-        samples, names = exp_config["generator"]()
-    else:
-        samples, names = exp_config["generator"](n=n_samples, noise=noise)
+    # Generate data
+    samples, names = exp_config["generator"](n=n_samples, noise=noise)
 
     # Create experiment-specific output dir
     exp_output_dir = output_dir / exp_config["name"]
@@ -140,10 +133,12 @@ def main():
         experiments = [e for e in EXPERIMENTS if e["name"].startswith(tuple(args.experiments))]
 
     # Run experiments
-    all_results = []
+    all_results = {}
     for exp_config in experiments:
         result = run_experiment(exp_config, output_dir, args.n_samples, args.noise)
-        all_results.append(result)
+        # Use exp1, exp2, exp3 as keys (extract number from name like "exp1_polynomial")
+        key = exp_config["name"].split("_")[0]
+        all_results[key] = result
 
         # Save individual result
         result_file = output_dir / f"{exp_config['name']}_result.pkl"
@@ -161,7 +156,7 @@ def main():
     print("\n" + "="*80)
     print(f"{'Experiment':<20} {'Ground Truth':<35} {'R²':>8}")
     print("="*80)
-    for r in all_results:
+    for key, r in all_results.items():
         print(f"{r['name']:<20} {r['ground_truth']:<35} {r['result'].best_fit.fit.r_squared:>8.4f}")
     print("="*80)
 
