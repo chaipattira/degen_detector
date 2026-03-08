@@ -1,0 +1,13 @@
+# Core dependencies for degen_detector
+numpy>=1.20.0
+scipy>=1.7.0
+sympy>=1.9
+pysr>=0.16.0
+matplotlib>=3.3.0
+
+# For corner plots (optional but used in plotting.py)
+corner>=2.2.0
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-cov>=3.0.0
