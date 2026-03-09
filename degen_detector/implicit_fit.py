@@ -84,13 +84,17 @@ class ImplicitFit:
 
 
 def _make_pysr_model_1d(max_complexity: int, niterations: int) -> PySRRegressor:
-    """Create a PySR model configured for 1D symbolic regression."""
+    """Create a PySR model configured for 1D symbolic regression.
+
+    Focuses on polynomial expressions (x, x^2) which are most common in
+    cosmological degeneracies. Avoids exp/trig to prevent overfitting.
+    """
     return PySRRegressor(
-        binary_operators=["+", "*", "^"],
-        unary_operators=["log", "exp"],
-        constraints={"^": (-1, 3)},
+        binary_operators=["+", "*"],
+        unary_operators=["square", "exp", "sqrt", "log"],
         maxsize=max_complexity,
         niterations=niterations,
+        #parsimony=0.01,  # Favor simpler expressions
         deterministic=True,
         parallelism='serial',
         random_state=42,
@@ -103,8 +107,8 @@ def fit_separable_implicit(
     samples: np.ndarray,
     param_names: list,
     max_iterations: int = 5,
-    max_complexity: int = 15,
-    niterations: int = 40,
+    max_complexity: int = 20,
+    niterations: int = 100,
     convergence_threshold: float = 0.01,
     verbose: bool = True,
 ) -> ImplicitFit:
@@ -124,9 +128,9 @@ def fit_separable_implicit(
         Names of the k parameters.
     max_iterations : int, default=5
         Maximum number of alternating optimization iterations.
-    max_complexity : int, default=15
+    max_complexity : int, default=20
         Maximum equation complexity for PySR.
-    niterations : int, default=40
+    niterations : int, default=100
         Number of PySR evolution iterations per component fit.
     convergence_threshold : float, default=0.01
         Stop when residual standard deviation falls below this value.
@@ -153,9 +157,10 @@ def fit_separable_implicit(
     X_std = np.where(X_std < 1e-12, 1.0, X_std)
     X_norm = (samples - X_mean) / X_std
 
-    # Initialize: gj(xj) = xj (identity functions)
-    component_values = [X_norm[:, j].copy() for j in range(k)]
-    component_exprs = [sympy.Symbol(f"z{j}") for j in range(k)]
+    # Initialize: gj(xj) = xj^2 (quadratic, good for polynomial degeneracies)
+    # Many degeneracies are polynomial, so starting with x^2 is better than x
+    component_values = [X_norm[:, j]**2 for j in range(k)]
+    component_exprs = [sympy.Symbol(f"z{j}")**2 for j in range(k)]
     c = float(np.mean(sum(component_values)))
 
     residual_std = np.inf

@@ -2,10 +2,12 @@
 """Plot diagnostics for synthetic degeneracy experiments.
 
 Usage:
-    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15552437/20260307_184700
+    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15623231/20260309_155800
 
 This script loads all .pkl result files from a directory and generates comprehensive diagnostic plots including:
 - Simple corner plots (no overlays)
+- Corner plots with implicit surface overlays
+- Residual corner plots
 - Component function plots
 - Ground truth vs predicted values for ALL component functions
 - Equation comparison text file (ground truth vs fitted with R² and R²_ortho)
@@ -18,6 +20,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import sympy as sp
+from scipy.optimize import brentq
 
 try:
     import dill as pickle
@@ -26,9 +29,51 @@ except ImportError:
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from degen_detector.plotting import (
-    plot_component_functions,
-)
+
+def plot_component_functions(fit, samples, figsize=None):
+    """Plot each component function g_j(x_j) with data points overlaid."""
+    k = len(fit.component_exprs)
+
+    if figsize is None:
+        figsize = (4 * k, 4)
+
+    fig, axes = plt.subplots(1, k, figsize=figsize)
+    if k == 1:
+        axes = [axes]
+
+    for i, (expr, pname) in enumerate(zip(fit.component_exprs, fit.param_names)):
+        ax = axes[i]
+
+        if isinstance(samples, dict):
+            x_data = samples[pname]
+        else:
+            x_data = samples[:, i] if samples.shape[1] == k else None
+
+        sym = sp.Symbol(pname)
+        g_func = sp.lambdify(sym, expr, modules="numpy")
+
+        if x_data is not None:
+            x_min, x_max = x_data.min(), x_data.max()
+            margin = 0.1 * (x_max - x_min)
+            x_range = np.linspace(x_min - margin, x_max + margin, 200)
+            g_data = g_func(x_data)
+            ax.scatter(x_data, g_data, alpha=0.3, s=5, c="steelblue", label="Data")
+        else:
+            x_range = np.linspace(-5, 5, 200)
+
+        g_curve = g_func(x_range)
+        ax.plot(x_range, g_curve, "r-", lw=2, label=f"$g_{{{i+1}}}$")
+
+        ax.set_xlabel(f"${pname}$", fontsize=12)
+        ax.set_ylabel(f"$g_{{{i+1}}}({pname})$", fontsize=12)
+        ax.set_title(f"$g_{{{i+1}}}({pname}) = {sp.latex(expr)}$", fontsize=10)
+        ax.legend(loc="best")
+        ax.grid(True, alpha=0.3)
+
+    fig.suptitle(f"{fit.equation_str}", fontsize=12, y=1.02)
+    plt.tight_layout()
+
+    return fig
 
 
 def plot_corner_simple(samples, param_names, figsize=None, color="steelblue", **corner_kwargs):

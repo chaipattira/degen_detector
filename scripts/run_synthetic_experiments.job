@@ -2,11 +2,11 @@
 #SBATCH --job-name=degen-synthetic   # Job name
 #SBATCH --nodes=1                    # Number of nodes
 #SBATCH --ntasks=1                   # Number of tasks
-#SBATCH --cpus-per-task=4            # CPUs per experiment
-#SBATCH --time=12:00:00              # Time limit (12 hours)
+#SBATCH --cpus-per-task=8            # CPUs per experiment
+#SBATCH --time=08:00:00              # Time limit (12 hours)
 #SBATCH --partition=shared           # Partition name
 #SBATCH --account=phy240043          # Account name
-#SBATCH --array=0-5                  # Array range for 6 experiments (exp1-exp6)
+#SBATCH --array=0-3                  # Array range for 4 experiments (exp1-exp4)
 #SBATCH --output=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out  # Output file
 #SBATCH --error=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out   # Error file
 
@@ -21,8 +21,6 @@ EXPERIMENTS=(
     "exp2"
     "exp3"
     "exp4"
-    "exp5"
-    "exp6"
 )
 
 # Select experiment based on array task ID
@@ -43,8 +41,7 @@ echo "=================================================="
 # Run the experiment
 python /home/x-ctirapongpra/scratch/degen_detector/scripts/run_synthetic_experiments.py \
     --experiments ${EXP} \
-    --output-dir ${OUTPUT_DIR} \
-    --max-fits 10 \
+    --output-dir ${OUTPUT_DIR}
 
 # Print completion info
 echo "=================================================="

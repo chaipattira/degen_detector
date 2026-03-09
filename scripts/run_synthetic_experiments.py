@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 """Run synthetic degeneracy experiments and save results for plotting.
 
+Four consolidated experiments test different separable function types:
+- exp1: Polynomial (cubic, quadratic terms: x^3 + y^2 - z)
+- exp2: Nonlinear Mixed (log, exp, sqrt, polynomial: log(x) + exp(y) - sqrt(z) + a^2)
+- exp3: Trigonometric (sin, cos functions: sin(x) + cos(y) - z)
+- exp4: S-curve (quadratic degeneracy on non-uniform manifold)
+
 Usage:
     python /home/x-ctirapongpra/scratch/degen_detector/scripts/run_synthetic_experiments.py --experiments exp1
 
@@ -24,57 +30,41 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from degen_detector import DegenDetector
 from degen_detector.synthetic import (
-    generate_linear_separable,
-    generate_log_separable,
-    generate_power_law,
-    generate_exp_linear,
-    generate_quadratic_separable,
+    generate_polynomial_separable,
+    generate_nonlinear_mixed,
     generate_trig_separable,
+    generate_scurve_separable,
 )
 
 
 EXPERIMENTS = [
     {
-        "name": "exp1_linear",
-        "generator": generate_linear_separable,
+        "name": "exp1_polynomial",
+        "generator": generate_polynomial_separable,
         "coupling_depth": 3,
-        "niterations": 40,
-        "max_fits": 5,
+        "niterations": 120,
+        "max_fits": 1,
     },
     {
-        "name": "exp2_log",
-        "generator": generate_log_separable,
-        "coupling_depth": 3,
-        "niterations": 40,
-        "max_fits": 5,
+        "name": "exp2_nonlinear_mixed",
+        "generator": generate_nonlinear_mixed,
+        "coupling_depth": 4,
+        "niterations": 120,
+        "max_fits": 1,
     },
     {
-        "name": "exp3_power_law",
-        "generator": generate_power_law,
-        "coupling_depth": 2,
-        "niterations": 40,
-        "max_fits": 5,
-    },
-    {
-        "name": "exp4_exp_linear",
-        "generator": generate_exp_linear,
-        "coupling_depth": 3,
-        "niterations": 40,
-        "max_fits": 5,
-    },
-    {
-        "name": "exp5_quadratic",
-        "generator": generate_quadratic_separable,
-        "coupling_depth": 3,
-        "niterations": 80,
-        "max_fits": 5,
-    },
-    {
-        "name": "exp6_trig",
+        "name": "exp3_trig",
         "generator": generate_trig_separable,
         "coupling_depth": 3,
-        "niterations": 80,
-        "max_fits": 5,
+        "niterations": 150,
+        "max_fits": 1,
+    },
+    {
+        "name": "exp4_scurve",
+        "generator": generate_scurve_separable,
+        "coupling_depth": 3,
+        "niterations": 200,
+        "max_fits": 1,
     },
 ]
 
@@ -135,7 +125,7 @@ def main():
     parser.add_argument(
         "--experiments",
         nargs="+",
-        choices=["exp1", "exp2", "exp3", "exp4", "exp5", "exp6"],
+        choices=["exp1", "exp2", "exp3", "exp4"],
         default=None,
         help="Specific experiments to run (default: all)",
     )
@@ -162,7 +152,9 @@ def main():
     # Run experiments
     all_results = {}
     for exp_config in experiments:
-        result = run_experiment(exp_config, output_dir, max_fits=args.max_fits)
+        # Use command-line max_fits if provided, otherwise use experiment's default
+        max_fits = args.max_fits if args.max_fits is not None else exp_config.get('max_fits')
+        result = run_experiment(exp_config, output_dir, max_fits=max_fits)
         # Use exp1, exp2, exp3, exp4 as keys (extract from name like "exp1_linear")
         key = exp_config["name"].split("_")[0]
         all_results[key] = result
