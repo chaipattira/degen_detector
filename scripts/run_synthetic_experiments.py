@@ -101,9 +101,13 @@ def run_experiment(exp_config, output_dir, max_fits=None):
     )
 
     print(f"\nSearch completed!")
-    print(f"Best fit: {result.best_fit.fit.equation_str}")
-    print(f"R²_ortho = {result.best_fit.fit.orthogonal_r2:.4f}")
-    print(f"Fits attempted: {result.n_fits_attempted}/{result.n_fits_total}")
+    print(f"Fits attempted: {result.n_fits_attempted}/{result.n_tuples_total}")
+
+    # Results are ranked by MI - first valid fit is the top candidate
+    top_fit = next((cf for cf in result.fits if cf.fit is not None), None)
+    if top_fit:
+        print(f"Top fit (by MI={top_fit.mi_score:.4f}): {top_fit.fit.equation_str}")
+        print(f"R²_ortho = {top_fit.fit.orthogonal_r2:.4f}")
 
     return {
         "name": exp_config["name"],
@@ -111,6 +115,7 @@ def run_experiment(exp_config, output_dir, max_fits=None):
         "samples": samples,
         "param_names": param_names,
         "result": result,
+        "top_fit": top_fit,  # First valid fit by MI ranking
     }
 
 
@@ -173,11 +178,16 @@ def main():
 
     # Print summary
     print("\n" + "="*80)
-    print(f"{'Experiment':<25} {'Ground Truth':<40} {'R²_ortho':>10}")
+    print(f"{'Experiment':<25} {'Ground Truth':<40} {'MI':>8} {'R²_ortho':>10}")
     print("="*80)
     for key, r in all_results.items():
         gt_eq = r['ground_truth']['equation']
-        print(f"{r['name']:<25} {gt_eq:<40} {r['result'].best_fit.fit.orthogonal_r2:>10.4f}")
+        if r['top_fit']:
+            mi = r['top_fit'].mi_score
+            r2 = r['top_fit'].fit.orthogonal_r2
+            print(f"{r['name']:<25} {gt_eq:<40} {mi:>8.4f} {r2:>10.4f}")
+        else:
+            print(f"{r['name']:<25} {gt_eq:<40} {'N/A':>8} {'N/A':>10}")
     print("="*80)
 
 

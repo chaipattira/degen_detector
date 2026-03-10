@@ -91,7 +91,7 @@ def _make_pysr_model_1d(max_complexity: int, niterations: int) -> PySRRegressor:
     """
     return PySRRegressor(
         binary_operators=["+", "*"],
-        unary_operators=["square", "exp", "sqrt", "log"],
+        unary_operators=["exp"],
         maxsize=max_complexity,
         niterations=niterations,
         #parsimony=0.01,  # Favor simpler expressions
@@ -241,8 +241,10 @@ def fit_separable_implicit(
     equation_str = " + ".join(terms) + f" = {c:.4f}"
 
     # Compute orthogonal R^2 using the implicit surface loss
+    # Note: normalize=False because expressions already contain the normalization
+    # transform (they expect raw coordinates and internally normalize)
     orthogonal_r2 = compute_orthogonal_r2(
-        component_exprs_orig, param_names, samples
+        component_exprs_orig, param_names, samples, c=c, normalize=False
     )
 
     return ImplicitFit(

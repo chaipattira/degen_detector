@@ -23,11 +23,9 @@ class CouplingFit:
 @dataclass
 class CouplingSearchResult:
     """Results from implicit coupling search."""
-    fits: list
-    best_fit: CouplingFit
-    stopped_early: bool
+    fits: list  # All fits ranked by MI (descending)
     n_fits_attempted: int
-    n_fits_total: int
+    n_tuples_total: int
     mi_result: 'MIResult'
     selected_params: list
 
@@ -57,7 +55,6 @@ class DegenDetector:
         self,
         params: Optional[Union[list, int]] = None,
         coupling_depth: int = 2,
-        r2_threshold: float = 0.95,
         max_fits: Optional[int] = None,
         mi_rank_method: str = "sum",
         max_complexity: int = 15,
@@ -68,6 +65,11 @@ class DegenDetector:
     ) -> CouplingSearchResult:
         """Search for implicit separable degeneracies.
 
+        Ranks parameter combinations by MI (mutual information) and fits
+        symbolic equations to each. Results are ranked by MI score - higher
+        MI indicates stronger statistical dependency (more likely true
+        degeneracy).
+
         Parameters
         ----------
         params : list[str] | int | None
@@ -77,12 +79,13 @@ class DegenDetector:
             - None: Use all parameters
         coupling_depth : int
             Size of parameter tuples to test (2 for pairs, 3 for triplets, etc.)
-        r2_threshold : float
-            Stop searching when a fit achieves orthogonal R² >= this value.
         max_fits : int | None
-            Maximum number of symbolic fits to attempt. None means try all.
+            Maximum number of tuples to fit. Tuples are processed in MI-ranked
+            order, so this fits the top N most promising combinations.
+            None means fit all.
         mi_rank_method : str
-            How to rank tuples by MI: "min", "avg", "sum", or "geometric".
+            How to aggregate pairwise MI into tuple score:
+            "min", "avg", "sum", or "geometric".
         max_complexity : int
             Maximum equation complexity for PySR.
         niterations : int
@@ -97,7 +100,7 @@ class DegenDetector:
         Returns
         -------
         CouplingSearchResult
-            Contains all attempted fits, best fit, and metadata.
+            Contains all fits ranked by MI (descending), with metadata.
         """
         if verbose:
             print("Computing mutual information matrix...")
@@ -120,19 +123,20 @@ class DegenDetector:
         )
         n_total = len(ranked_tuples)
 
+        # Limit number of fits if requested
+        tuples_to_fit = ranked_tuples[:max_fits] if max_fits else ranked_tuples
+        n_to_fit = len(tuples_to_fit)
+
         if verbose:
             print(f"Generated {n_total} {coupling_depth}-tuples, ranked by {mi_rank_method} MI")
+            if max_fits and max_fits < n_total:
+                print(f"Fitting top {n_to_fit} tuples by MI")
 
         fits = []
-        best_fit = None
-        stopped_early = False
 
-        for i, rt in enumerate(ranked_tuples):
-            if max_fits is not None and i >= max_fits:
-                break
-
+        for i, rt in enumerate(tuples_to_fit):
             if verbose:
-                print(f"Fitting {i+1}/{n_total}: {rt.param_names} (MI={rt.mi_score:.4f})")
+                print(f"Fitting {i+1}/{n_to_fit}: {rt.param_names} (MI={rt.mi_score:.4f})")
 
             tuple_samples = self.samples[:, rt.param_indices]
 
@@ -163,25 +167,15 @@ class DegenDetector:
             if fit is not None:
                 if verbose:
                     print(f"  -> R²_ortho = {fit.orthogonal_r2:.4f}: {fit.equation_str}")
-
-                if best_fit is None or fit.orthogonal_r2 > best_fit.fit.orthogonal_r2:
-                    best_fit = coupling_fit
-
-                if fit.orthogonal_r2 >= r2_threshold:
-                    if verbose:
-                        print(f"Early stop: R²_ortho >= {r2_threshold}")
-                    stopped_early = True
-                    break
             else:
                 if verbose:
                     print("  -> Fit failed")
 
+        # Fits are already in MI-ranked order (descending)
         return CouplingSearchResult(
             fits=fits,
-            best_fit=best_fit,
-            stopped_early=stopped_early,
-            n_fits_attempted=len(fits),
-            n_fits_total=n_total,
+            n_fits_attempted=n_to_fit,
+            n_tuples_total=n_total,
             mi_result=mi_result,
             selected_params=selected_names,
         )

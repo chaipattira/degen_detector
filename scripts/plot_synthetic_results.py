@@ -2,7 +2,7 @@
 """Plot diagnostics for synthetic degeneracy experiments.
 
 Usage:
-    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15623231/20260309_155800
+    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15627082/20260309_193657
 
 This script loads all .pkl result files from a directory and generates comprehensive diagnostic plots including:
 - Simple corner plots (no overlays)
@@ -285,7 +285,12 @@ def plot_experiment_diagnostics(result_data, output_dir):
     result = result_data['result']
     ground_truth = result_data['ground_truth']
 
-    best_fit = result.best_fit.fit
+    # Get the top fit by MI ranking (first valid fit)
+    top_cf = next((cf for cf in result.fits if cf.fit is not None), None)
+    if top_cf is None:
+        print(f"Warning: No valid fit for {exp_name}, skipping plots")
+        return
+    best_fit = top_cf.fit
 
     print(f"\nGenerating plots for {exp_name}...")
 
@@ -331,23 +336,32 @@ def plot_summary(all_results, output_dir):
     output_dir : Path
         Directory to save the summary plot.
     """
-    n_exp = len(all_results)
+    # Helper to get top fit from result
+    def get_top_fit(result):
+        return next((cf.fit for cf in result.fits if cf.fit is not None), None)
+
+    # Filter to only results with valid fits
+    valid_results = {k: v for k, v in all_results.items() if get_top_fit(v['result']) is not None}
+    if not valid_results:
+        print("No valid fits to summarize")
+        return
 
     # Create one row per experiment, columns for each component
-    max_components = max(len(rd['result'].best_fit.fit.param_names) for rd in all_results.values())
+    max_components = max(len(get_top_fit(rd['result']).param_names) for rd in valid_results.values())
 
-    fig, axes = plt.subplots(n_exp, max_components, figsize=(5*max_components, 5*n_exp))
-    if n_exp == 1 and max_components == 1:
+    n_valid = len(valid_results)
+    fig, axes = plt.subplots(n_valid, max_components, figsize=(5*max_components, 5*n_valid))
+    if n_valid == 1 and max_components == 1:
         axes = np.array([[axes]])
-    elif n_exp == 1:
+    elif n_valid == 1:
         axes = axes.reshape(1, -1)
     elif max_components == 1:
         axes = axes.reshape(-1, 1)
 
-    for row_idx, (key, result_data) in enumerate(all_results.items()):
+    for row_idx, (key, result_data) in enumerate(valid_results.items()):
         samples = result_data['samples']
         param_names = result_data['param_names']
-        best_fit = result_data['result'].best_fit.fit
+        best_fit = get_top_fit(result_data['result'])
 
         predictions = compute_all_component_predictions(best_fit, samples, param_names)
 
