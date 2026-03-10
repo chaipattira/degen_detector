@@ -87,14 +87,15 @@ def _make_pysr_model_1d(max_complexity: int, niterations: int) -> PySRRegressor:
     """Create a PySR model configured for 1D symbolic regression.
 
     Focuses on polynomial expressions (x, x^2) which are most common in
-    cosmological degeneracies. Avoids exp/trig to prevent overfitting.
+    cosmological degeneracies. Exponential operator heavily penalized.
     """
     return PySRRegressor(
         binary_operators=["+", "*"],
-        unary_operators=["exp"],
+        unary_operators=["exp", "log"],
         maxsize=max_complexity,
         niterations=niterations,
-        #parsimony=0.01,  # Favor simpler expressions
+        parsimony=0.01,  # Favor simpler expressions
+        constraints={"exp": 4},  # exp costs more complexity units (heavily penalized)
         deterministic=True,
         parallelism='serial',
         random_state=42,
@@ -157,10 +158,10 @@ def fit_separable_implicit(
     X_std = np.where(X_std < 1e-12, 1.0, X_std)
     X_norm = (samples - X_mean) / X_std
 
-    # Initialize: gj(xj) = xj^2 (quadratic, good for polynomial degeneracies)
-    # Many degeneracies are polynomial, so starting with x^2 is better than x
-    component_values = [X_norm[:, j]**2 for j in range(k)]
-    component_exprs = [sympy.Symbol(f"z{j}")**2 for j in range(k)]
+    # Initialize: gj(xj) = xj (identity/linear)
+    # Simpler, more general starting point for alternating optimization
+    component_values = [X_norm[:, j].copy() for j in range(k)]
+    component_exprs = [sympy.Symbol(f"z{j}") for j in range(k)]
     c = float(np.mean(sum(component_values)))
 
     residual_std = np.inf

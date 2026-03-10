@@ -2,7 +2,7 @@
 """Plot diagnostics for synthetic degeneracy experiments.
 
 Usage:
-    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15627082/20260309_193657
+    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15638672/20260310_051328
 
 This script loads all .pkl result files from a directory and generates comprehensive diagnostic plots including:
 - Simple corner plots (no overlays)
