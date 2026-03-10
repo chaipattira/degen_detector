@@ -1,0 +1,41 @@
+#!/bin/bash
+#SBATCH --job-name=degen-planck      # Job name
+#SBATCH --nodes=1                    # Number of nodes
+#SBATCH --ntasks=1                   # Number of tasks
+#SBATCH --cpus-per-task=8            # CPUs per task
+#SBATCH --time=02:00:00              # Time limit (2 hours - longer for real data)
+#SBATCH --partition=shared           # Partition name
+#SBATCH --account=phy240043          # Account name
+#SBATCH --output=/anvil/scratch/x-ctirapongpra/jobout/%x_%j.out  # Output file
+#SBATCH --error=/anvil/scratch/x-ctirapongpra/jobout/%x_%j.out   # Error file
+
+# Load conda environment
+cd /home/x-ctirapongpra/scratch/
+module load anaconda
+conda activate degen_detector  # Update this to your actual conda environment name
+
+# Set output directory with job ID for tracking
+OUTPUT_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/outputs/planck_${SLURM_JOB_ID}"
+
+# Print job information
+echo "=================================================="
+echo "Job ID: ${SLURM_JOB_ID}"
+echo "Analysis: Planck 2018 ΛCDM"
+echo "Node: $(hostname)"
+echo "Start time: $(date)"
+echo "Output directory: ${OUTPUT_DIR}"
+echo "=================================================="
+
+# Run the Planck analysis
+python /home/x-ctirapongpra/scratch/degen_detector/scripts/run_planck_analysis.py \
+    --output-dir ${OUTPUT_DIR} \
+    --coupling-depth 4 \
+    --niterations 150 \
+    --max-complexity 20 \
+    --max-fits 3
+
+# Print completion info
+echo "=================================================="
+echo "Planck analysis completed"
+echo "End time: $(date)"
+echo "=================================================="

@@ -101,6 +101,7 @@ def _make_pysr_model_1d(max_complexity: int, niterations: int) -> PySRRegressor:
         random_state=42,
         progress=False,
         verbosity=0,
+        batching=True,  # Enable batching for large datasets
     )
 
 

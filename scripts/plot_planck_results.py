@@ -1,19 +1,18 @@
 #!/usr/bin/env python
-"""Plot diagnostics for synthetic degeneracy experiments.
+"""Plot diagnostics for Planck degeneracy analysis results.
 
 Usage:
-    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15639511/20260310_071719
+    python /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_planck_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/planck_15640695/20260310_101619
 
-This script loads all .pkl result files from a directory and generates comprehensive diagnostic plots including:
-- Simple corner plots (no overlays)
+This script loads .pkl result files from a Planck analysis run and generates comprehensive
+diagnostic plots including:
+- Corner plots showing posterior distributions
 - Corner plots with implicit surface overlays
 - Residual corner plots
-- Component function plots
-- Ground truth vs predicted values for ALL component functions
-- Equation comparison text file (ground truth vs fitted with R² and R²_ortho)
-- Summary comparison across experiments
-- 3D visualizations of the constraint manifold
-- 2D projections of the constraint
+- Component function plots showing each g_j(x_j)
+- True vs predicted values for all component functions
+- 3D visualizations of the constraint manifold (for 3-parameter degeneracies)
+- 2D projections of constraints
 """
 import argparse
 import sys
@@ -23,7 +22,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sympy as sp
 from mpl_toolkits.mplot3d import Axes3D
-from scipy.optimize import brentq
 
 try:
     import dill as pickle
@@ -34,7 +32,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def plot_component_functions(fit, samples, figsize=None):
-    """Plot each component function g_j(x_j) with data points overlaid."""
+    """Plot each component function g_j(x_j) with data points overlaid.
+
+    Parameters
+    ----------
+    fit : ImplicitFit
+        The fitted implicit surface.
+    samples : ndarray
+        Sample data corresponding to the fitted parameters.
+    figsize : tuple, optional
+        Figure size.
+
+    Returns
+    -------
+    fig : matplotlib.Figure
+    """
     k = len(fit.component_exprs)
 
     if figsize is None:
@@ -137,7 +149,7 @@ def compute_all_component_predictions(fit, samples, param_names):
     Returns
     -------
     predictions : list of tuples
-        List of (true_g, pred_g, param_name) for each component function.
+        List of (true_g, pred_g, param_name, comp_num) for each component function.
     """
     k = len(fit.param_names)
     predictions = []
@@ -235,47 +247,10 @@ def plot_all_components_true_vs_predicted(fit, samples, param_names):
     return fig
 
 
-def save_equation_comparison(ground_truth, fit, output_path):
-    """Save a text comparison of ground truth vs fitted equation.
+def plot_3d_visualization(samples, param_names, fitted_eq=None, output_path=None):
+    """Create 3D visualization of the constraint surface.
 
-    Parameters
-    ----------
-    ground_truth : dict
-        Dictionary with 'equation' and 'component_functions' keys.
-    fit : ImplicitFit
-        The fitted implicit surface.
-    output_path : Path
-        Path to save the text file.
-    """
-    # Ground truth text
-    gt_text = f"Ground Truth:\n{ground_truth['equation']}\n\n"
-    gt_text += "Component functions:\n"
-    for comp in ground_truth['component_functions']:
-        gt_text += f"  {comp}\n"
-
-    # Fitted equation text
-    fit_text = f"\n\nFitted Equation:\n{fit.equation_str}\n"
-
-    # Include both R² metrics if available
-    if hasattr(fit, 'r2'):
-        fit_text += f"R² = {fit.r2:.4f}\n"
-    if hasattr(fit, 'orthogonal_r2'):
-        fit_text += f"R²_ortho = {fit.orthogonal_r2:.4f}\n"
-
-    fit_text += "\nComponent functions:\n"
-    for i, (expr, pname) in enumerate(zip(fit.component_exprs, fit.param_names)):
-        fit_text += f"  g{i+1}({pname}) = {expr}\n"
-
-    full_text = gt_text + fit_text
-
-    with open(output_path, 'w') as f:
-        f.write(full_text)
-
-
-def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, output_path=None):
-    """Create 3D visualization comparing ground truth and fitted constraint surfaces.
-
-    Works for any 3-parameter degeneracy (extracts first 3 degenerate parameters).
+    Only works for 3-parameter degeneracies.
 
     Parameters
     ----------
@@ -283,21 +258,21 @@ def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, out
         Sample data of shape (N, M).
     param_names : list
         Parameter names.
-    ground_truth : dict
-        Ground truth equation info with 'degenerate_params' key.
     fitted_eq : ImplicitFit, optional
         Fitted equation to overlay.
     output_path : Path, optional
         Path to save the figure.
+
+    Returns
+    -------
+    fig : matplotlib.Figure or None
     """
-    # Extract degenerate parameters (first 3)
-    degen_params = ground_truth.get('degenerate_params', param_names[:3])
-    if len(degen_params) < 3:
-        print(f"Warning: Only {len(degen_params)} degenerate params, need 3 for 3D plot")
+    if len(fitted_eq.param_names) != 3:
+        print(f"Warning: 3D visualization requires exactly 3 parameters, got {len(fitted_eq.param_names)}")
         return None
 
-    # Use first 3 degenerate parameters
-    param1, param2, param3 = degen_params[:3]
+    # Extract the three parameters from the fit
+    param1, param2, param3 = fitted_eq.param_names
     idx1 = param_names.index(param1)
     idx2 = param_names.index(param2)
     idx3 = param_names.index(param3)
@@ -310,30 +285,23 @@ def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, out
     fig = plt.figure(figsize=(14, 6))
 
     # ============================================================================
-    # Plot 1: Data points + Ground truth constraint surface
+    # Plot 1: Data points only
     # ============================================================================
     ax1 = fig.add_subplot(121, projection='3d')
-
-    # Plot data points
-    ax1.scatter(x, y, z, c='steelblue', alpha=0.4, s=10, label='Data')
-
-    # Note: Ground truth surface plotting is experiment-specific
-    # For now, just show the data
-    gt_eq = ground_truth.get('equation', 'N/A')
+    ax1.scatter(x, y, z, c='steelblue', alpha=0.4, s=10, label='MCMC samples')
 
     ax1.set_xlabel(param1, fontsize=12, labelpad=10)
     ax1.set_ylabel(param2, fontsize=12, labelpad=10)
     ax1.set_zlabel(param3, fontsize=12, labelpad=10)
-    ax1.set_title(f'Data Points\nGround Truth: {gt_eq}', fontsize=11, pad=20)
+    ax1.set_title('Planck 2018 ΛCDM Posterior', fontsize=11, pad=20)
     ax1.view_init(elev=20, azim=45)
+    ax1.legend()
 
     # ============================================================================
-    # Plot 2: Data points + Fitted surface (if available)
+    # Plot 2: Data points + Fitted surface
     # ============================================================================
     ax2 = fig.add_subplot(122, projection='3d')
-
-    # Plot data points
-    ax2.scatter(x, y, z, c='steelblue', alpha=0.4, s=10, label='Data')
+    ax2.scatter(x, y, z, c='steelblue', alpha=0.4, s=10, label='MCMC samples')
 
     from matplotlib.patches import Patch
 
@@ -343,9 +311,9 @@ def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, out
 
         try:
             # Get component functions
-            g1_expr = fitted_eq.component_exprs[0]  # function of x
-            g2_expr = fitted_eq.component_exprs[1]  # function of y
-            g3_expr = fitted_eq.component_exprs[2]  # function of z
+            g1_expr = fitted_eq.component_exprs[0]  # function of param1
+            g2_expr = fitted_eq.component_exprs[1]  # function of param2
+            g3_expr = fitted_eq.component_exprs[2]  # function of param3
             const = fitted_eq.constant
 
             # Create lambdified functions
@@ -381,12 +349,12 @@ def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, out
 
                 # Plot fitted surface
                 surf_fitted = ax2.plot_surface(X_grid, Y_grid, Z_grid_fitted,
-                                              alpha=0.3, color='green',
+                                              alpha=0.3, color='red',
                                               label='Fitted Surface')
 
                 legend_elements = [
-                    Patch(facecolor='steelblue', alpha=0.4, label='Data points'),
-                    Patch(facecolor='green', alpha=0.3, label=f'Fitted: R²={fitted_eq.orthogonal_r2:.3f}')
+                    Patch(facecolor='steelblue', alpha=0.4, label='MCMC samples'),
+                    Patch(facecolor='red', alpha=0.3, label=f'Fitted: R²={fitted_eq.orthogonal_r2:.3f}')
                 ]
                 ax2.legend(handles=legend_elements, loc='upper left', fontsize=9)
             else:
@@ -395,18 +363,15 @@ def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, out
                           transform=ax2.transAxes, ha='center', fontsize=9)
 
         except Exception as e:
-            ax2.text2D(0.5, 0.95, f'Could not compute fitted surface',
+            ax2.text2D(0.5, 0.95, f'Could not compute fitted surface: {e}',
                       transform=ax2.transAxes, ha='center', fontsize=9)
 
         ax2.set_xlabel(param1, fontsize=12, labelpad=10)
         ax2.set_ylabel(param2, fontsize=12, labelpad=10)
         ax2.set_zlabel(param3, fontsize=12, labelpad=10)
-        title = f'Data + Fitted Surface\nR²_ortho = {fitted_eq.orthogonal_r2:.4f}'
+        title = f'Fitted Constraint Surface\nR²_ortho = {fitted_eq.orthogonal_r2:.4f}'
         ax2.set_title(title, fontsize=12, pad=20)
         ax2.view_init(elev=20, azim=45)
-    else:
-        ax2.text(0.5, 0.5, 0.5, 'No fitted equation available',
-                ha='center', va='center', transform=ax2.transAxes)
 
     plt.tight_layout()
 
@@ -417,10 +382,10 @@ def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, out
     return fig
 
 
-def plot_scurve_2d_projections(samples, param_names, ground_truth, fitted_eq=None, output_path=None):
+def plot_2d_projections(samples, param_names, fitted_eq=None, output_path=None):
     """Create 2D projection plots showing the constraint.
 
-    Works for any 3-parameter degeneracy (extracts first 3 degenerate parameters).
+    Works for 3-parameter degeneracies.
 
     Parameters
     ----------
@@ -428,21 +393,21 @@ def plot_scurve_2d_projections(samples, param_names, ground_truth, fitted_eq=Non
         Sample data of shape (N, M).
     param_names : list
         Parameter names.
-    ground_truth : dict
-        Ground truth equation info.
     fitted_eq : ImplicitFit, optional
         Fitted equation to overlay.
     output_path : Path, optional
         Path to save the figure.
+
+    Returns
+    -------
+    fig : matplotlib.Figure or None
     """
-    # Extract degenerate parameters (first 3)
-    degen_params = ground_truth.get('degenerate_params', param_names[:3])
-    if len(degen_params) < 3:
-        print(f"Warning: Only {len(degen_params)} degenerate params, need 3 for plots")
+    if fitted_eq is None or len(fitted_eq.param_names) != 3:
+        print(f"Warning: 2D projections require exactly 3 parameters")
         return None
 
-    # Use first 3 degenerate parameters
-    param1, param2, param3 = degen_params[:3]
+    # Extract the three parameters from the fit
+    param1, param2, param3 = fitted_eq.param_names
     idx1 = param_names.index(param1)
     idx2 = param_names.index(param2)
     idx3 = param_names.index(param3)
@@ -453,27 +418,27 @@ def plot_scurve_2d_projections(samples, param_names, ground_truth, fitted_eq=Non
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    gt_eq = ground_truth.get('equation', 'N/A')
-
     # ============================================================================
     # Panel 1: param1 vs param3
     # ============================================================================
     ax = axes[0]
-    ax.scatter(x, z, alpha=0.4, s=5, c='steelblue', label='Data')
+    ax.scatter(x, z, alpha=0.4, s=5, c='steelblue', label='MCMC samples')
     ax.set_xlabel(param1, fontsize=12)
     ax.set_ylabel(param3, fontsize=12)
     ax.set_title(f'{param1} vs {param3}', fontsize=11)
     ax.grid(True, alpha=0.3)
+    ax.legend()
 
     # ============================================================================
     # Panel 2: param2 vs param3
     # ============================================================================
     ax = axes[1]
-    ax.scatter(y, z, alpha=0.4, s=5, c='steelblue', label='Data')
+    ax.scatter(y, z, alpha=0.4, s=5, c='steelblue', label='MCMC samples')
     ax.set_xlabel(param2, fontsize=12)
     ax.set_ylabel(param3, fontsize=12)
     ax.set_title(f'{param2} vs {param3}', fontsize=11)
     ax.grid(True, alpha=0.3)
+    ax.legend()
 
     # ============================================================================
     # Panel 3: param1 vs param2 (colored by param3)
@@ -486,7 +451,7 @@ def plot_scurve_2d_projections(samples, param_names, ground_truth, fitted_eq=Non
     plt.colorbar(scatter, ax=ax, label=param3)
     ax.grid(True, alpha=0.3)
 
-    fig.suptitle(f'Ground Truth: {gt_eq}', fontsize=12, y=1.02)
+    fig.suptitle(f'Fitted Equation: {fitted_eq.equation_str}', fontsize=12, y=1.02)
 
     plt.tight_layout()
 
@@ -497,39 +462,88 @@ def plot_scurve_2d_projections(samples, param_names, ground_truth, fitted_eq=Non
     return fig
 
 
-def plot_experiment_diagnostics(result_data, output_dir):
-    """Create all diagnostic plots for a single experiment.
+def save_equation_info(fit, output_path, successful_fits=None, top_n=5):
+    """Save fitted equation information to a text file.
+
+    Parameters
+    ----------
+    fit : ImplicitFit
+        The best fitted implicit surface.
+    output_path : Path
+        Path to save the text file.
+    successful_fits : list of CandidateFit, optional
+        List of all successful fits to include comparison.
+    top_n : int
+        Number of top fits to include in comparison (default: 5).
+    """
+    text = f"Best Fitted Equation:\n{fit.equation_str}\n\n"
+
+    # Include R² metrics
+    if hasattr(fit, 'r2'):
+        text += f"R² = {fit.r2:.4f}\n"
+    if hasattr(fit, 'orthogonal_r2'):
+        text += f"R²_ortho = {fit.orthogonal_r2:.4f}\n"
+
+    text += "\nComponent functions:\n"
+    for i, (expr, pname) in enumerate(zip(fit.component_exprs, fit.param_names)):
+        text += f"  g{i+1}({pname}) = {expr}\n"
+
+    text += f"\nConstant: c = {fit.constant:.6f}\n"
+
+    # Add comparison of top fits if available
+    if successful_fits and len(successful_fits) > 1:
+        text += "\n" + "="*80 + "\n"
+        text += "TOP FITS COMPARISON\n"
+        text += "="*80 + "\n\n"
+
+        fits_to_include = successful_fits[:min(top_n, len(successful_fits))]
+
+        for idx, cf in enumerate(fits_to_include):
+            fit_obj = cf.fit
+            text += f"Rank {idx+1}:\n"
+            text += f"  Equation: {fit_obj.equation_str}\n"
+            text += f"  MI score: {cf.mi_score:.4f}\n"
+            text += f"  R²_ortho: {fit_obj.orthogonal_r2:.4f}\n"
+            text += f"  Component functions:\n"
+            for i, (expr, pname) in enumerate(zip(fit_obj.component_exprs, fit_obj.param_names)):
+                text += f"    g{i+1}({pname}) = {expr}\n"
+            text += "\n"
+
+    with open(output_path, 'w') as f:
+        f.write(text)
+
+
+def plot_planck_diagnostics(result_data, output_dir):
+    """Create all diagnostic plots for Planck analysis.
 
     Parameters
     ----------
     result_data : dict
-        Dictionary containing 'samples', 'param_names', 'result', 'ground_truth', 'name'.
+        Dictionary containing 'samples', 'param_names', 'result', 'name'.
     output_dir : Path
         Directory to save plots.
     """
-    exp_name = result_data['name']
+    name = result_data['name']
     samples = result_data['samples']
     param_names = result_data['param_names']
     result = result_data['result']
-    ground_truth = result_data['ground_truth']
 
     # Get the top fit by MI ranking (first valid fit)
     top_cf = next((cf for cf in result.fits if cf.fit is not None), None)
     if top_cf is None:
-        print(f"Warning: No valid fit for {exp_name}, skipping plots")
+        print(f"Warning: No valid fit for {name}, skipping plots")
         return
     best_fit = top_cf.fit
 
-    print(f"\nGenerating plots for {exp_name}...")
+    print(f"\nGenerating plots for {name}...")
 
-    # Create experiment-specific output directory
-    exp_plot_dir = output_dir / exp_name
-    exp_plot_dir.mkdir(parents=True, exist_ok=True)
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Simple corner plot (no overlays or equations)
+    # 1. Simple corner plot
     print("  - Corner plot")
     fig1 = plot_corner_simple(samples, param_names)
-    fig1.savefig(exp_plot_dir / "corner_with_surface.png", dpi=150, bbox_inches='tight')
+    fig1.savefig(output_dir / "corner_plot.png", dpi=150, bbox_inches='tight')
     plt.close(fig1)
 
     # 2. Component functions
@@ -538,42 +552,44 @@ def plot_experiment_diagnostics(result_data, output_dir):
     fit_indices = [param_names.index(p) for p in best_fit.param_names]
     fit_samples = samples[:, fit_indices]
     fig2 = plot_component_functions(best_fit, fit_samples)
-    fig2.savefig(exp_plot_dir / "component_functions.png", dpi=150, bbox_inches='tight')
+    fig2.savefig(output_dir / "component_functions.png", dpi=150, bbox_inches='tight')
     plt.close(fig2)
 
     # 3. True vs Predicted for all components
     print("  - True vs predicted plot (all components)")
     fig3 = plot_all_components_true_vs_predicted(best_fit, samples, param_names)
-    fig3.savefig(exp_plot_dir / "true_vs_predicted_all_components.png", dpi=150, bbox_inches='tight')
+    fig3.savefig(output_dir / "true_vs_predicted_all_components.png", dpi=150, bbox_inches='tight')
     plt.close(fig3)
 
-    # 4. Equation comparison (save as text file)
-    print("  - Equation comparison")
-    save_equation_comparison(ground_truth, best_fit, exp_plot_dir / "equation_comparison.txt")
+    # 4. Equation info (save as text file with top fits comparison)
+    print("  - Equation information")
+    successful_fits = result_data.get('successful_fits', [])
+    save_equation_info(best_fit, output_dir / "equation_info.txt",
+                      successful_fits=successful_fits, top_n=5)
 
-    # 5. 3D visualization (if applicable - 3+ degenerate parameters)
-    degen_params = ground_truth.get('degenerate_params', param_names[:3])
-    if len(degen_params) >= 3:
+    # 5. 3D visualization (if applicable - exactly 3 parameters in fit)
+    if len(best_fit.param_names) == 3:
         print("  - 3D visualization")
-        fig4 = plot_scurve_manifold(samples, param_names, ground_truth,
-                                     fitted_eq=best_fit,
-                                     output_path=exp_plot_dir / "3d_visualization.png")
+        fig4 = plot_3d_visualization(samples, param_names,
+                                      fitted_eq=best_fit,
+                                      output_path=output_dir / "3d_visualization.png")
         if fig4:
             plt.close(fig4)
 
         # 6. 2D projections
         print("  - 2D projections")
-        fig5 = plot_scurve_2d_projections(samples, param_names, ground_truth,
-                                          fitted_eq=best_fit,
-                                          output_path=exp_plot_dir / "2d_projections.png")
+        fig5 = plot_2d_projections(samples, param_names,
+                                    fitted_eq=best_fit,
+                                    output_path=output_dir / "2d_projections.png")
         if fig5:
             plt.close(fig5)
 
-    print(f"  Saved all plots to {exp_plot_dir}")
+    print(f"  Saved all plots to {output_dir}")
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate diagnostic plots for synthetic experiments"
+        description="Generate diagnostic plots for Planck degeneracy analysis"
     )
     parser.add_argument(
         "pkl_dir",
@@ -608,7 +624,7 @@ def main():
             with open(pkl_file, "rb") as f:
                 data = pickle.load(f)
 
-            # Handle both single experiment and multi-experiment formats
+            # Handle both single and multi-experiment formats
             if isinstance(data, dict):
                 if 'samples' in data and 'result' in data:
                     # Single experiment format
@@ -617,7 +633,7 @@ def main():
                     if 'name' not in data:
                         data['name'] = exp_name
                 else:
-                    # Multi-experiment format (dictionary of experiments)
+                    # Multi-experiment format
                     all_results.update(data)
             else:
                 print(f"  Warning: Unexpected format in {pkl_file.name}, skipping")
@@ -637,11 +653,7 @@ def main():
 
     # Generate diagnostics for each experiment
     for key, result_data in all_results.items():
-        plot_experiment_diagnostics(result_data, plots_dir)
-
-    # Generate summary plot
-    if len(all_results) > 1:
-        plot_summary(all_results, plots_dir)
+        plot_planck_diagnostics(result_data, plots_dir)
 
     print("\n" + "="*80)
     print("All plots generated successfully!")
