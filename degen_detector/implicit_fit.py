@@ -91,11 +91,11 @@ def _make_pysr_model_1d(max_complexity: int, niterations: int) -> PySRRegressor:
     """
     return PySRRegressor(
         binary_operators=["+", "*"],
-        unary_operators=["exp", "log"],
+        unary_operators=["exp"],
         maxsize=max_complexity,
         niterations=niterations,
         parsimony=0.01,  # Favor simpler expressions
-        constraints={"exp": 4},  # exp costs more complexity units (heavily penalized)
+        constraints={"exp": 2},  # exp costs more complexity units (more penalized)
         deterministic=True,
         parallelism='serial',
         random_state=42,

@@ -7,13 +7,12 @@ This module generates test datasets where parameters follow the separable form:
 import numpy as np
 
 def generate_scurve_separable(n=2000, noise=0.1, seed=42):
-    """Generate dataset using S-curve manifold with separable degeneracy: x^2 + y^2 + z = 6.
+    """Generate dataset with S-curve separable degeneracy: (x^3 - 3x) + y + z = 0.
 
-    Uses sklearn's S-curve manifold to generate a non-uniform sampling distribution,
-    then imposes a separable quadratic constraint: x^2 + y^2 + z = c.
-
-    This tests whether the detector can identify separable degeneracies when the
-    parameter space is sampled from a complex manifold rather than uniform distributions.
+    Uses cubic function to create a pronounced S-curve constraint in the x-z plane.
+    The cubic term (x^3 - 3x) creates dramatic curves at top and bottom, resembling
+    the letter "S". This tests whether the detector can identify separable degeneracies
+    with nonlinear S-shaped transformations.
 
     Parameters
     ----------
@@ -33,21 +32,16 @@ def generate_scurve_separable(n=2000, noise=0.1, seed=42):
     ground_truth : dict
         Dictionary containing equation, component_functions, constant, degenerate_params.
     """
-    from sklearn.datasets import make_s_curve
-
-    # Generate S-curve manifold (returns 3D points and parameter t)
-    X_scurve, _ = make_s_curve(n_samples=n, noise=0.0, random_state=seed)
-
     rng = np.random.default_rng(seed)
 
-    # Use S-curve coordinates for non-uniform sampling
-    # S-curve x is in [-1, 1] roughly, y is in [0, 2]
-    x = X_scurve[:, 0]
-    y = X_scurve[:, 1]
+    # Sample x and y uniformly
+    x = rng.uniform(-2, 2, n)
+    y = rng.uniform(-2, 2, n)
 
-    # Impose separable constraint: x^2 + y^2 + z = c
-    c = 6.0  # Chosen to keep z in reasonable range given x, y distributions
-    z = c - x**2 - y**2 + rng.normal(0, noise, n)
+    # Impose S-curve constraint: (x^3 - 3x) + y + z = 0
+    # Solve for z: z = -(x^3 - 3x) - y + noise = -x^3 + 3x - y + noise
+    c = 0.0
+    z = -(x**3 - 3*x) - y + rng.normal(0, noise, n)
 
     # Add independent parameters
     a = rng.normal(0, 1, n)
@@ -59,8 +53,8 @@ def generate_scurve_separable(n=2000, noise=0.1, seed=42):
     param_names = ['x', 'y', 'z', 'a', 'b', 'c', 'd']
 
     ground_truth = {
-        'equation': 'x^2 + y^2 + z = 6',
-        'component_functions': ['g1(x) = x^2', 'g2(y) = y^2', 'g3(z) = z'],
+        'equation': '(x^3 - 3x) + y + z = 0',
+        'component_functions': ['g1(x) = x^3 - 3x', 'g2(y) = y', 'g3(z) = z'],
         'constant': c,
         'degenerate_params': ['x', 'y', 'z']
     }
@@ -118,10 +112,10 @@ def generate_polynomial_separable(n=2000, noise=0.1, seed=42):
 
 
 def generate_nonlinear_mixed(n=2000, noise=0.1, seed=42):
-    """Generate dataset with log/exp/power/polynomial mixed: log(x) + exp(y) - sqrt(z) + a^2 = 2.
+    """Generate dataset with log/exp mixed: exp(x) + log(y) - z = 2.
 
-    Combines logarithmic, exponential, power-law (sqrt), and polynomial (quadratic) transformations
-    to test detector's ability to find diverse nonlinear separable degeneracies.
+    Combines exponential and logarithmic transformations to test detector's
+    ability to find diverse nonlinear separable degeneracies.
 
     Parameters
     ----------
@@ -144,14 +138,14 @@ def generate_nonlinear_mixed(n=2000, noise=0.1, seed=42):
     rng = np.random.default_rng(seed)
 
     c = 2.0
-    x = rng.uniform(0.5, 3, n)  # Positive for log
-    y = rng.uniform(-1, 1, n)   # Limited range for exp
-    a = rng.uniform(-1.5, 1.5, n)  # Moderate range for polynomial term
+    x = rng.uniform(-1, 1, n)   # Limited range for exp
+    y = rng.uniform(0.5, 3, n)  # Positive for log
 
-    # z = (log(x) + exp(y) + a^2 - c)^2, then sqrt(z) = log(x) + exp(y) + a^2 - c
-    z = (np.log(x) + np.exp(y) + a**2 - c + rng.normal(0, noise, n)) ** 2
-    z = np.abs(z)  # Ensure positive for sqrt
+    # Impose constraint: exp(x) + log(y) - z = c
+    # Solve for z: z = exp(x) + log(y) - c + noise
+    z = np.exp(x) + np.log(y) - c + rng.normal(0, noise, n)
 
+    a = rng.normal(0, 1, n)
     b = rng.normal(0, 1, n)
     c_param = rng.normal(0, 1, n)
     d = rng.normal(0, 1, n)
@@ -160,10 +154,10 @@ def generate_nonlinear_mixed(n=2000, noise=0.1, seed=42):
     param_names = ['x', 'y', 'z', 'a', 'b', 'c', 'd']
 
     ground_truth = {
-        'equation': 'log(x) + exp(y) - sqrt(z) + a^2 = 2',
-        'component_functions': ['g1(x) = log(x)', 'g2(y) = exp(y)', 'g3(z) = -sqrt(z)', 'g4(a) = a^2'],
+        'equation': 'exp(x) + log(y) - z = 2',
+        'component_functions': ['g1(x) = exp(x)', 'g2(y) = log(y)', 'g3(z) = -z'],
         'constant': c,
-        'degenerate_params': ['x', 'y', 'z', 'a']
+        'degenerate_params': ['x', 'y', 'z']
     }
 
     return samples, param_names, ground_truth

@@ -3,7 +3,7 @@
 #SBATCH --nodes=1                    # Number of nodes
 #SBATCH --ntasks=1                   # Number of tasks
 #SBATCH --cpus-per-task=8            # CPUs per experiment
-#SBATCH --time=08:00:00              # Time limit (12 hours)
+#SBATCH --time=01:00:00              # Time limit (1 hour)
 #SBATCH --partition=shared           # Partition name
 #SBATCH --account=phy240043          # Account name
 #SBATCH --array=0-3                  # Array range for 4 experiments (exp1-exp4)

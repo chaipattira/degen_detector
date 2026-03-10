@@ -2,7 +2,7 @@
 """Plot diagnostics for synthetic degeneracy experiments.
 
 Usage:
-    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15638672/20260310_051328
+    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15639511/20260310_071719
 
 This script loads all .pkl result files from a directory and generates comprehensive diagnostic plots including:
 - Simple corner plots (no overlays)
@@ -12,6 +12,8 @@ This script loads all .pkl result files from a directory and generates comprehen
 - Ground truth vs predicted values for ALL component functions
 - Equation comparison text file (ground truth vs fitted with R² and R²_ortho)
 - Summary comparison across experiments
+- 3D visualizations of the constraint manifold
+- 2D projections of the constraint
 """
 import argparse
 import sys
@@ -20,6 +22,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import sympy as sp
+from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import brentq
 
 try:
@@ -269,6 +272,231 @@ def save_equation_comparison(ground_truth, fit, output_path):
         f.write(full_text)
 
 
+def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, output_path=None):
+    """Create 3D visualization comparing ground truth and fitted constraint surfaces.
+
+    Works for any 3-parameter degeneracy (extracts first 3 degenerate parameters).
+
+    Parameters
+    ----------
+    samples : ndarray
+        Sample data of shape (N, M).
+    param_names : list
+        Parameter names.
+    ground_truth : dict
+        Ground truth equation info with 'degenerate_params' key.
+    fitted_eq : ImplicitFit, optional
+        Fitted equation to overlay.
+    output_path : Path, optional
+        Path to save the figure.
+    """
+    # Extract degenerate parameters (first 3)
+    degen_params = ground_truth.get('degenerate_params', param_names[:3])
+    if len(degen_params) < 3:
+        print(f"Warning: Only {len(degen_params)} degenerate params, need 3 for 3D plot")
+        return None
+
+    # Use first 3 degenerate parameters
+    param1, param2, param3 = degen_params[:3]
+    idx1 = param_names.index(param1)
+    idx2 = param_names.index(param2)
+    idx3 = param_names.index(param3)
+
+    x = samples[:, idx1]
+    y = samples[:, idx2]
+    z = samples[:, idx3]
+
+    # Create figure with 2 subplots
+    fig = plt.figure(figsize=(14, 6))
+
+    # ============================================================================
+    # Plot 1: Data points + Ground truth constraint surface
+    # ============================================================================
+    ax1 = fig.add_subplot(121, projection='3d')
+
+    # Plot data points
+    ax1.scatter(x, y, z, c='steelblue', alpha=0.4, s=10, label='Data')
+
+    # Note: Ground truth surface plotting is experiment-specific
+    # For now, just show the data
+    gt_eq = ground_truth.get('equation', 'N/A')
+
+    ax1.set_xlabel(param1, fontsize=12, labelpad=10)
+    ax1.set_ylabel(param2, fontsize=12, labelpad=10)
+    ax1.set_zlabel(param3, fontsize=12, labelpad=10)
+    ax1.set_title(f'Data Points\nGround Truth: {gt_eq}', fontsize=11, pad=20)
+    ax1.view_init(elev=20, azim=45)
+
+    # ============================================================================
+    # Plot 2: Data points + Fitted surface (if available)
+    # ============================================================================
+    ax2 = fig.add_subplot(122, projection='3d')
+
+    # Plot data points
+    ax2.scatter(x, y, z, c='steelblue', alpha=0.4, s=10, label='Data')
+
+    from matplotlib.patches import Patch
+
+    if fitted_eq is not None:
+        # Compute fitted surface: g₁(x) + g₂(y) + g₃(z) = c
+        # Solve for z: g₃(z) = c - g₁(x) - g₂(y)
+
+        try:
+            # Get component functions
+            g1_expr = fitted_eq.component_exprs[0]  # function of x
+            g2_expr = fitted_eq.component_exprs[1]  # function of y
+            g3_expr = fitted_eq.component_exprs[2]  # function of z
+            const = fitted_eq.constant
+
+            # Create lambdified functions
+            x_sym = sp.Symbol(fitted_eq.param_names[0])
+            y_sym = sp.Symbol(fitted_eq.param_names[1])
+            z_sym = sp.Symbol(fitted_eq.param_names[2])
+
+            g1_func = sp.lambdify(x_sym, g1_expr, modules='numpy')
+            g2_func = sp.lambdify(y_sym, g2_expr, modules='numpy')
+            g3_func = sp.lambdify(z_sym, g3_expr, modules='numpy')
+
+            # For surface plot, we need to solve for z given x and y
+            # g₃(z) = c - g₁(x) - g₂(y)
+            # For linear g₃ (like g₃=a*z+b), we can solve analytically
+
+            # Check if g₃ is linear in z
+            g3_poly = sp.Poly(g3_expr, z_sym)
+            if g3_poly.degree() == 1:
+                # Linear: g₃(z) = a*z + b
+                coeffs = g3_poly.all_coeffs()
+                a = float(coeffs[0])  # coefficient of z
+                b = float(coeffs[1]) if len(coeffs) > 1 else 0.0  # constant term
+
+                # Solve: a*z + b = c - g₁(x) - g₂(y)
+                # z = [c - g₁(x) - g₂(y) - b] / a
+
+                x_range = np.linspace(x.min(), x.max(), 50)
+                y_range = np.linspace(y.min(), y.max(), 50)
+                X_grid, Y_grid = np.meshgrid(x_range, y_range)
+
+                # Compute fitted z values
+                Z_grid_fitted = (const - g1_func(X_grid) - g2_func(Y_grid) - b) / a
+
+                # Plot fitted surface
+                surf_fitted = ax2.plot_surface(X_grid, Y_grid, Z_grid_fitted,
+                                              alpha=0.3, color='green',
+                                              label='Fitted Surface')
+
+                legend_elements = [
+                    Patch(facecolor='steelblue', alpha=0.4, label='Data points'),
+                    Patch(facecolor='green', alpha=0.3, label=f'Fitted: R²={fitted_eq.orthogonal_r2:.3f}')
+                ]
+                ax2.legend(handles=legend_elements, loc='upper left', fontsize=9)
+            else:
+                # Non-linear g₃, just show data
+                ax2.text2D(0.5, 0.95, f'Non-linear {param3} function, cannot plot surface',
+                          transform=ax2.transAxes, ha='center', fontsize=9)
+
+        except Exception as e:
+            ax2.text2D(0.5, 0.95, f'Could not compute fitted surface',
+                      transform=ax2.transAxes, ha='center', fontsize=9)
+
+        ax2.set_xlabel(param1, fontsize=12, labelpad=10)
+        ax2.set_ylabel(param2, fontsize=12, labelpad=10)
+        ax2.set_zlabel(param3, fontsize=12, labelpad=10)
+        title = f'Data + Fitted Surface\nR²_ortho = {fitted_eq.orthogonal_r2:.4f}'
+        ax2.set_title(title, fontsize=12, pad=20)
+        ax2.view_init(elev=20, azim=45)
+    else:
+        ax2.text(0.5, 0.5, 0.5, 'No fitted equation available',
+                ha='center', va='center', transform=ax2.transAxes)
+
+    plt.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        print(f"Saved 3D visualization to {output_path}")
+
+    return fig
+
+
+def plot_scurve_2d_projections(samples, param_names, ground_truth, fitted_eq=None, output_path=None):
+    """Create 2D projection plots showing the constraint.
+
+    Works for any 3-parameter degeneracy (extracts first 3 degenerate parameters).
+
+    Parameters
+    ----------
+    samples : ndarray
+        Sample data of shape (N, M).
+    param_names : list
+        Parameter names.
+    ground_truth : dict
+        Ground truth equation info.
+    fitted_eq : ImplicitFit, optional
+        Fitted equation to overlay.
+    output_path : Path, optional
+        Path to save the figure.
+    """
+    # Extract degenerate parameters (first 3)
+    degen_params = ground_truth.get('degenerate_params', param_names[:3])
+    if len(degen_params) < 3:
+        print(f"Warning: Only {len(degen_params)} degenerate params, need 3 for plots")
+        return None
+
+    # Use first 3 degenerate parameters
+    param1, param2, param3 = degen_params[:3]
+    idx1 = param_names.index(param1)
+    idx2 = param_names.index(param2)
+    idx3 = param_names.index(param3)
+
+    x = samples[:, idx1]
+    y = samples[:, idx2]
+    z = samples[:, idx3]
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    gt_eq = ground_truth.get('equation', 'N/A')
+
+    # ============================================================================
+    # Panel 1: param1 vs param3
+    # ============================================================================
+    ax = axes[0]
+    ax.scatter(x, z, alpha=0.4, s=5, c='steelblue', label='Data')
+    ax.set_xlabel(param1, fontsize=12)
+    ax.set_ylabel(param3, fontsize=12)
+    ax.set_title(f'{param1} vs {param3}', fontsize=11)
+    ax.grid(True, alpha=0.3)
+
+    # ============================================================================
+    # Panel 2: param2 vs param3
+    # ============================================================================
+    ax = axes[1]
+    ax.scatter(y, z, alpha=0.4, s=5, c='steelblue', label='Data')
+    ax.set_xlabel(param2, fontsize=12)
+    ax.set_ylabel(param3, fontsize=12)
+    ax.set_title(f'{param2} vs {param3}', fontsize=11)
+    ax.grid(True, alpha=0.3)
+
+    # ============================================================================
+    # Panel 3: param1 vs param2 (colored by param3)
+    # ============================================================================
+    ax = axes[2]
+    scatter = ax.scatter(x, y, c=z, cmap='viridis', alpha=0.6, s=10)
+    ax.set_xlabel(param1, fontsize=12)
+    ax.set_ylabel(param2, fontsize=12)
+    ax.set_title(f'{param1} vs {param2}\n(colored by {param3})', fontsize=11)
+    plt.colorbar(scatter, ax=ax, label=param3)
+    ax.grid(True, alpha=0.3)
+
+    fig.suptitle(f'Ground Truth: {gt_eq}', fontsize=12, y=1.02)
+
+    plt.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        print(f"Saved 2D projections to {output_path}")
+
+    return fig
+
+
 def plot_experiment_diagnostics(result_data, output_dir):
     """Create all diagnostic plots for a single experiment.
 
@@ -322,6 +550,24 @@ def plot_experiment_diagnostics(result_data, output_dir):
     # 4. Equation comparison (save as text file)
     print("  - Equation comparison")
     save_equation_comparison(ground_truth, best_fit, exp_plot_dir / "equation_comparison.txt")
+
+    # 5. 3D visualization (if applicable - 3+ degenerate parameters)
+    degen_params = ground_truth.get('degenerate_params', param_names[:3])
+    if len(degen_params) >= 3:
+        print("  - 3D visualization")
+        fig4 = plot_scurve_manifold(samples, param_names, ground_truth,
+                                     fitted_eq=best_fit,
+                                     output_path=exp_plot_dir / "3d_visualization.png")
+        if fig4:
+            plt.close(fig4)
+
+        # 6. 2D projections
+        print("  - 2D projections")
+        fig5 = plot_scurve_2d_projections(samples, param_names, ground_truth,
+                                          fitted_eq=best_fit,
+                                          output_path=exp_plot_dir / "2d_projections.png")
+        if fig5:
+            plt.close(fig5)
 
     print(f"  Saved all plots to {exp_plot_dir}")
 
