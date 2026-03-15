@@ -2,7 +2,7 @@
 """Plot diagnostics for Planck degeneracy analysis results.
 
 Usage:
-    python /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_planck_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/planck_15640695/20260310_101619
+    python /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_planck_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15685653/20260313_202917
 
 This script loads .pkl result files from a Planck analysis run and generates comprehensive
 diagnostic plots including:

@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """Run synthetic degeneracy experiments and save results for plotting.
 
-Four consolidated experiments test different separable function types:
-- exp1: Polynomial (cubic, quadratic terms: x^3 + y^2 - z)
-- exp2: Nonlinear Mixed (log, exp, sqrt, polynomial: log(x) + exp(y) - sqrt(z) + a^2)
+Four consolidated experiments test different degeneracy types:
+- exp1: Banana-shaped degeneracy (Figure 11 from paper: theta2 ≈ 2*theta1^2 - 0.5)
+- exp2: Cubic degeneracy with informative prior (Figure 12: theta1 ≈ (10*theta2)^3)
 - exp3: Trigonometric (sin, cos functions: sin(x) + cos(y) - z)
-- exp4: S-curve (quadratic degeneracy on non-uniform manifold)
+- exp4: S-curve (cubic degeneracy on non-uniform manifold: x^3 - 3x + y + z = 0)
 
 Usage:
     python /home/x-ctirapongpra/scratch/degen_detector/scripts/run_synthetic_experiments.py --experiments exp1
@@ -30,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from degen_detector import DegenDetector
 from degen_detector.synthetic import (
-    generate_polynomial_separable,
-    generate_nonlinear_mixed,
+    generate_banana_degeneracy,
+    generate_cubic_degeneracy,
     generate_trig_separable,
     generate_scurve_separable,
 )
@@ -39,17 +39,17 @@ from degen_detector.synthetic import (
 
 EXPERIMENTS = [
     {
-        "name": "exp1_polynomial",
-        "generator": generate_polynomial_separable,
-        "coupling_depth": 3,
-        "niterations": 120,
+        "name": "exp1_banana",
+        "generator": generate_banana_degeneracy,
+        "coupling_depth": 2,
+        "niterations": 200,
         "max_fits": 1,
     },
     {
-        "name": "exp2_nonlinear_mixed",
-        "generator": generate_nonlinear_mixed,
-        "coupling_depth": 4,
-        "niterations": 120,
+        "name": "exp2_cubic",
+        "generator": generate_cubic_degeneracy,
+        "coupling_depth": 2,
+        "niterations": 200,
         "max_fits": 1,
     },
     {

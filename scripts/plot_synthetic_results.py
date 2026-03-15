@@ -2,7 +2,10 @@
 """Plot diagnostics for synthetic degeneracy experiments.
 
 Usage:
-    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15639511/20260310_071719
+    cd /home/x-ctirapongpra/scratch
+    module load anaconda
+    conda activate degen_detector
+    python3 /home/x-ctirapongpra/scratch/degen_detector/scripts/plot_synthetic_results.py /home/x-ctirapongpra/scratch/degen_detector/outputs/synthetic_15710222/20260315_091846
 
 This script loads all .pkl result files from a directory and generates comprehensive diagnostic plots including:
 - Simple corner plots (no overlays)
@@ -241,7 +244,7 @@ def save_equation_comparison(ground_truth, fit, output_path):
     Parameters
     ----------
     ground_truth : dict
-        Dictionary with 'equation' and 'component_functions' keys.
+        Dictionary with 'equation' key and optional 'component_functions' key.
     fit : ImplicitFit
         The fitted implicit surface.
     output_path : Path
@@ -249,9 +252,10 @@ def save_equation_comparison(ground_truth, fit, output_path):
     """
     # Ground truth text
     gt_text = f"Ground Truth:\n{ground_truth['equation']}\n\n"
-    gt_text += "Component functions:\n"
-    for comp in ground_truth['component_functions']:
-        gt_text += f"  {comp}\n"
+    if 'component_functions' in ground_truth:
+        gt_text += "Component functions:\n"
+        for comp in ground_truth['component_functions']:
+            gt_text += f"  {comp}\n"
 
     # Fitted equation text
     fit_text = f"\n\nFitted Equation:\n{fit.equation_str}\n"
@@ -417,6 +421,149 @@ def plot_scurve_manifold(samples, param_names, ground_truth, fitted_eq=None, out
     return fig
 
 
+def plot_2param_degeneracy(samples, param_names, ground_truth, fitted_eq=None, output_path=None):
+    """Create theta1 vs theta2 plot with fitted equation overlay (for 2-param degeneracies).
+
+    For banana and cubic degeneracies, plots:
+    - Data scatter of theta1 vs theta2
+    - Ground truth theoretical curve (dashed line)
+    - Fitted equation (solid red line)
+
+    Parameters
+    ----------
+    samples : ndarray
+        Sample data of shape (N, M).
+    param_names : list
+        Parameter names.
+    ground_truth : dict
+        Ground truth equation info with 'degenerate_params' and 'constraint' keys.
+    fitted_eq : ImplicitFit, optional
+        Fitted equation to overlay.
+    output_path : Path, optional
+        Path to save the figure.
+    """
+    # Extract degenerate parameters (should be 2)
+    degen_params = ground_truth.get('degenerate_params', param_names[:2])
+    if len(degen_params) != 2:
+        print(f"Warning: Expected 2 degenerate params, got {len(degen_params)}")
+        return None
+
+    param1, param2 = degen_params[:2]
+    idx1 = param_names.index(param1)
+    idx2 = param_names.index(param2)
+
+    theta1 = samples[:, idx1]
+    theta2 = samples[:, idx2]
+
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+
+    # Plot data scatter
+    ax.scatter(theta1, theta2, alpha=0.3, s=10, c='steelblue', label='Data', zorder=1)
+
+    # Overlay ground truth theoretical curve (if we know it)
+    gt_constraint = ground_truth.get('constraint', '')
+    if 'banana' in ground_truth.get('figure', '').lower():
+        # Banana: theta2 ≈ 2*theta1^2 - 0.5
+        theta1_theory = np.linspace(theta1.min(), theta1.max(), 200)
+        theta2_theory = 2 * theta1_theory**2 - 0.5
+        ax.plot(theta1_theory, theta2_theory, 'k--', linewidth=2,
+                label='Ground truth: $\\theta_2 = 2\\theta_1^2 - 0.5$', zorder=2)
+    elif 'cubic' in ground_truth.get('figure', '').lower():
+        # Cubic: theta1 ≈ (10*theta2)^3
+        theta2_theory = np.linspace(theta2.min(), theta2.max(), 200)
+        theta1_theory = (10 * theta2_theory)**3
+        # Clip to data range for better visualization
+        mask = (theta1_theory >= theta1.min()) & (theta1_theory <= theta1.max())
+        ax.plot(theta1_theory[mask], theta2_theory[mask], 'k--', linewidth=2,
+                label='Ground truth: $\\theta_1 = (10\\theta_2)^3$', zorder=2)
+
+    # Overlay fitted equation (red line)
+    if fitted_eq is not None:
+        try:
+            # For separable fit: g1(theta1) + g2(theta2) = c
+            # Solve for theta2 as a function of theta1
+            g1_expr = fitted_eq.component_exprs[0]
+            g2_expr = fitted_eq.component_exprs[1]
+            const = fitted_eq.constant
+
+            theta1_sym = sp.Symbol(fitted_eq.param_names[0])
+            theta2_sym = sp.Symbol(fitted_eq.param_names[1])
+
+            g1_func = sp.lambdify(theta1_sym, g1_expr, modules='numpy')
+            g2_func = sp.lambdify(theta2_sym, g2_expr, modules='numpy')
+
+            # Check if g2 is a linear polynomial
+            is_linear = False
+            try:
+                g2_poly = sp.Poly(g2_expr, theta2_sym)
+                is_linear = (g2_poly.degree() == 1)
+            except:
+                # Not a polynomial (e.g., contains exp, log, etc.)
+                is_linear = False
+
+            # For linear g2: solve g2(theta2) = c - g1(theta1)
+            if is_linear:
+                # g2 = a*theta2 + b
+                coeffs = g2_poly.all_coeffs()
+                a = float(coeffs[0])
+                b = float(coeffs[1]) if len(coeffs) > 1 else 0.0
+
+                theta1_range = np.linspace(theta1.min(), theta1.max(), 200)
+                # theta2 = (c - g1(theta1) - b) / a
+                theta2_fitted = (const - g1_func(theta1_range) - b) / a
+
+                ax.plot(theta1_range, theta2_fitted, 'r-', linewidth=3,
+                        label=f'Fitted (R²_ortho={fitted_eq.orthogonal_r2:.3f})', zorder=3)
+            else:
+                # Try numerical inversion for non-linear g2
+                # Sample points and solve numerically
+                theta1_range = np.linspace(theta1.min(), theta1.max(), 100)
+                theta2_fitted = []
+
+                for t1 in theta1_range:
+                    target = const - g1_func(t1)
+
+                    # Define equation to solve: g2(theta2) - target = 0
+                    def equation(t2):
+                        return g2_func(t2) - target
+
+                    try:
+                        # Use brentq to find root in data range
+                        t2_sol = brentq(equation, theta2.min(), theta2.max())
+                        theta2_fitted.append(t2_sol)
+                    except:
+                        theta2_fitted.append(np.nan)
+
+                theta2_fitted = np.array(theta2_fitted)
+                valid = np.isfinite(theta2_fitted)
+
+                if np.sum(valid) > 10:
+                    ax.plot(theta1_range[valid], theta2_fitted[valid], 'r-', linewidth=3,
+                            label=f'Fitted (R²_ortho={fitted_eq.orthogonal_r2:.3f})', zorder=3)
+                else:
+                    ax.text(0.5, 0.95, 'Could not plot fitted curve',
+                           transform=ax.transAxes, ha='center', fontsize=10)
+
+        except Exception as e:
+            print(f"  Warning: Could not plot fitted curve: {e}")
+            ax.text(0.5, 0.95, f'Could not plot fitted curve',
+                   transform=ax.transAxes, ha='center', fontsize=10)
+
+    ax.set_xlabel(f'${param1}$', fontsize=14)
+    ax.set_ylabel(f'${param2}$', fontsize=14)
+    ax.set_title(f'{param1} vs {param2}\nGround Truth: {gt_constraint}', fontsize=12)
+    ax.legend(loc='best', fontsize=11)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        print(f"Saved 2-param degeneracy plot to {output_path}")
+
+    return fig
+
+
 def plot_scurve_2d_projections(samples, param_names, ground_truth, fitted_eq=None, output_path=None):
     """Create 2D projection plots showing the constraint.
 
@@ -551,25 +698,36 @@ def plot_experiment_diagnostics(result_data, output_dir):
     print("  - Equation comparison")
     save_equation_comparison(ground_truth, best_fit, exp_plot_dir / "equation_comparison.txt")
 
-    # 5. 3D visualization (if applicable - 3+ degenerate parameters)
+    # 5. Special plot for 2-parameter degeneracies (banana and cubic)
+    degen_params = ground_truth.get('degenerate_params', param_names[:2])
+    if len(degen_params) == 2:
+        print("  - theta1 vs theta2 with fitted curve")
+        fig_2param = plot_2param_degeneracy(samples, param_names, ground_truth,
+                                            fitted_eq=best_fit,
+                                            output_path=exp_plot_dir / "theta1_vs_theta2.png")
+        if fig_2param:
+            plt.close(fig_2param)
+
+    # 6. 3D visualization (if applicable - 3+ degenerate parameters)
     degen_params = ground_truth.get('degenerate_params', param_names[:3])
     if len(degen_params) >= 3:
         print("  - 3D visualization")
-        fig4 = plot_scurve_manifold(samples, param_names, ground_truth,
-                                     fitted_eq=best_fit,
-                                     output_path=exp_plot_dir / "3d_visualization.png")
-        if fig4:
-            plt.close(fig4)
+        fig_3d = plot_scurve_manifold(samples, param_names, ground_truth,
+                                       fitted_eq=best_fit,
+                                       output_path=exp_plot_dir / "3d_visualization.png")
+        if fig_3d:
+            plt.close(fig_3d)
 
-        # 6. 2D projections
+        # 7. 2D projections
         print("  - 2D projections")
-        fig5 = plot_scurve_2d_projections(samples, param_names, ground_truth,
-                                          fitted_eq=best_fit,
-                                          output_path=exp_plot_dir / "2d_projections.png")
-        if fig5:
-            plt.close(fig5)
+        fig_2d = plot_scurve_2d_projections(samples, param_names, ground_truth,
+                                            fitted_eq=best_fit,
+                                            output_path=exp_plot_dir / "2d_projections.png")
+        if fig_2d:
+            plt.close(fig_2d)
 
     print(f"  Saved all plots to {exp_plot_dir}")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -638,10 +796,6 @@ def main():
     # Generate diagnostics for each experiment
     for key, result_data in all_results.items():
         plot_experiment_diagnostics(result_data, plots_dir)
-
-    # Generate summary plot
-    if len(all_results) > 1:
-        plot_summary(all_results, plots_dir)
 
     print("\n" + "="*80)
     print("All plots generated successfully!")

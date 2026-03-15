@@ -86,16 +86,16 @@ class ImplicitFit:
 def _make_pysr_model_1d(max_complexity: int, niterations: int) -> PySRRegressor:
     """Create a PySR model configured for 1D symbolic regression.
 
-    Focuses on polynomial expressions (x, x^2) which are most common in
+    Focuses on polynomial expressions (x, x^2, x^3) which are most common in
     cosmological degeneracies. Exponential operator heavily penalized.
     """
     return PySRRegressor(
         binary_operators=["+", "*"],
-        unary_operators=["exp"],
+        unary_operators=["exp"],  # Added cube operator for cubic degeneracies
         maxsize=max_complexity,
         niterations=niterations,
         parsimony=0.01,  # Favor simpler expressions
-        constraints={"exp": 2},  # exp costs more complexity units (more penalized)
+        constraints={"exp": 2},  # cube costs 3 complexity units 
         deterministic=True,
         parallelism='serial',
         random_state=42,

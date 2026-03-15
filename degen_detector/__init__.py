@@ -7,8 +7,8 @@ from degen_detector.implicit_fit import ImplicitFit, fit_separable_implicit
 from degen_detector.loss import compute_orthogonal_loss, compute_orthogonal_r2
 
 from degen_detector.synthetic import (
-    generate_polynomial_separable,
-    generate_nonlinear_mixed,
+    generate_banana_degeneracy,
+    generate_cubic_degeneracy,
     generate_trig_separable,
     generate_scurve_separable,
 )
