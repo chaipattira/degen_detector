@@ -113,14 +113,16 @@ def fit_separable_implicit(
     niterations: int = 100,
     convergence_threshold: float = 0.01,
     verbose: bool = True,
-) -> ImplicitFit:
+    n_candidates: int = 5,
+) -> list:
     """Fit an implicit surface of separable form.
 
     Finds functions g1, g2, ..., gk and constant c such that:
         g1(x1) + g2(x2) + ... + gk(xk) = c
 
     Uses alternating optimization: fix all but one component, fit that
-    component, then move to the next.
+    component, then move to the next. Returns top n_candidates complete
+    surfaces by exploring PySR's hall of fame for each component.
 
     Parameters
     ----------
@@ -138,11 +140,13 @@ def fit_separable_implicit(
         Stop when residual standard deviation falls below this value.
     verbose : bool, default=True
         Print progress information.
+    n_candidates : int, default=5
+        Number of candidate equations to return, ranked by orthogonal_r2.
 
     Returns
     -------
-    fit : ImplicitFit
-        The fitted implicit surface with component expressions.
+    fits : list of ImplicitFit
+        Top n_candidates fitted implicit surfaces, ranked by orthogonal_r2.
     """
     k = len(param_names)
     n_samples = samples.shape[0]
@@ -166,6 +170,9 @@ def fit_separable_implicit(
     c = float(np.mean(sum(component_values)))
 
     residual_std = np.inf
+
+    # Store PySR models for each component to access hall of fame later
+    component_models = [None] * k
 
     for iteration in range(max_iterations):
         if verbose:
@@ -192,6 +199,9 @@ def fit_separable_implicit(
             model = _make_pysr_model_1d(max_complexity, niterations)
             x_j = X_norm[:, j].reshape(-1, 1)
             model.fit(x_j, target_j, variable_names=[f"z{j}"])
+
+            # Store model for later access to hall of fame
+            component_models[j] = model
 
             # Get best expression
             expr_j = model.sympy()
@@ -221,39 +231,105 @@ def fit_separable_implicit(
                 print(f"Converged at iteration {iteration + 1}")
             break
 
-    # Transform expressions back to original coordinates
-    # If X_norm = (X - mu) / sigma, substitute zj = (xj - mu_j) / sigma_j
-    component_exprs_orig = []
-    for j, expr in enumerate(component_exprs):
-        sym_orig = sympy.Symbol(param_names[j])
-        sym_norm = sympy.Symbol(f"z{j}")
-        # zj = (xj - mu_j) / sigma_j
-        substitution = (sym_orig - X_mean[j]) / X_std[j]
-        expr_orig = expr.subs(sym_norm, substitution)
-        component_exprs_orig.append(sympy.simplify(expr_orig))
+    # Helper function to create ImplicitFit from component expressions
+    def create_implicit_fit(comp_exprs_norm, c_value):
+        """Create ImplicitFit from normalized component expressions."""
+        # Transform expressions back to original coordinates
+        comp_exprs_orig = []
+        for j, expr in enumerate(comp_exprs_norm):
+            sym_orig = sympy.Symbol(param_names[j])
+            sym_norm = sympy.Symbol(f"z{j}")
+            # zj = (xj - mu_j) / sigma_j
+            substitution = (sym_orig - X_mean[j]) / X_std[j]
+            expr_orig = expr.subs(sym_norm, substitution)
+            comp_exprs_orig.append(sympy.simplify(expr_orig))
 
-    # Build equation string
-    terms = []
-    for expr in component_exprs_orig:
-        term_str = str(expr)
-        if term_str.startswith("-"):
-            terms.append(f"({term_str})")
-        else:
-            terms.append(term_str)
-    equation_str = " + ".join(terms) + f" = {c:.4f}"
+        # Build equation string
+        terms = []
+        for expr in comp_exprs_orig:
+            term_str = str(expr)
+            if term_str.startswith("-"):
+                terms.append(f"({term_str})")
+            else:
+                terms.append(term_str)
+        equation_str = " + ".join(terms) + f" = {c_value:.4f}"
 
-    # Compute orthogonal R^2 using the implicit surface loss
-    # Note: normalize=False because expressions already contain the normalization
-    # transform (they expect raw coordinates and internally normalize)
-    orthogonal_r2 = compute_orthogonal_r2(
-        component_exprs_orig, param_names, samples, c=c, normalize=False
-    )
+        # Compute residual_std in normalized space
+        comp_vals_norm = []
+        for j, expr in enumerate(comp_exprs_norm):
+            sym_j = sympy.Symbol(f"z{j}")
+            fn_j = sympy.lambdify(sym_j, expr, modules="numpy")
+            comp_vals_norm.append(fn_j(X_norm[:, j]))
+        total_norm = sum(comp_vals_norm)
+        residual_norm = total_norm - c_value
+        res_std = float(np.std(residual_norm))
 
-    return ImplicitFit(
-        component_exprs=component_exprs_orig,
-        constant=c,
-        param_names=param_names,
-        residual_std=residual_std,
-        orthogonal_r2=orthogonal_r2,
-        equation_str=equation_str,
-    )
+        # Compute orthogonal R^2 using the implicit surface loss
+        orthogonal_r2 = compute_orthogonal_r2(
+            comp_exprs_orig, param_names, samples, c=c_value, normalize=False
+        )
+
+        return ImplicitFit(
+            component_exprs=comp_exprs_orig,
+            constant=c_value,
+            param_names=param_names,
+            residual_std=res_std,
+            orthogonal_r2=orthogonal_r2,
+            equation_str=equation_str,
+        )
+
+    # Generate candidate fits by exploring PySR hall of fame
+    candidates = []
+
+    # Always include the best fit (default converged solution)
+    best_fit = create_implicit_fit(component_exprs, c)
+    candidates.append(best_fit)
+
+    if verbose:
+        print(f"\nGenerating top {n_candidates} candidate fits from hall of fame...")
+
+    # For each component, extract alternative equations from hall of fame
+    max_alternatives = min(3, n_candidates)  # Get top 3 alternatives per component
+    for j in range(k):
+        model = component_models[j]
+        if model is None or not hasattr(model, 'equations_'):
+            continue
+
+        # Get equations DataFrame sorted by loss
+        eqs = model.equations_
+        if len(eqs) <= 1:
+            continue  # Only one equation available
+
+        # Take top equations (skip the first one as it's already in best_fit)
+        n_alts = min(max_alternatives, len(eqs) - 1)
+        for alt_idx in range(1, n_alts + 1):
+            if alt_idx >= len(eqs):
+                break
+
+            # Create alternative component expressions by swapping j-th component
+            alt_comp_exprs = component_exprs.copy()
+            try:
+                alt_expr = eqs.iloc[alt_idx]['sympy_format']
+                alt_comp_exprs[j] = alt_expr
+
+                # Create ImplicitFit with alternative expression
+                alt_fit = create_implicit_fit(alt_comp_exprs, c)
+                candidates.append(alt_fit)
+
+                if verbose:
+                    print(f"  Component {j} alt {alt_idx}: R²_ortho={alt_fit.orthogonal_r2:.4f}")
+            except Exception as e:
+                if verbose:
+                    print(f"  Component {j} alt {alt_idx}: Failed - {e}")
+                continue
+
+    # Rank candidates by orthogonal_r2 (descending) and return top n_candidates
+    candidates.sort(key=lambda f: f.orthogonal_r2, reverse=True)
+    top_candidates = candidates[:n_candidates]
+
+    if verbose:
+        print(f"\nReturning top {len(top_candidates)} fits:")
+        for i, fit in enumerate(top_candidates):
+            print(f"  [{i+1}] R²_ortho={fit.orthogonal_r2:.4f}, residual_std={fit.residual_std:.6f}")
+
+    return top_candidates

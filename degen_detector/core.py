@@ -12,12 +12,37 @@ from degen_detector.implicit_fit import ImplicitFit, fit_separable_implicit
 
 @dataclass
 class CouplingFit:
-    """Result of fitting one parameter tuple."""
+    """Result of fitting one parameter tuple.
+
+    Attributes
+    ----------
+    param_names : list
+        Names of parameters in this tuple.
+    param_indices : list
+        Indices of parameters in this tuple.
+    mi_score : float
+        Mutual information score for this tuple.
+    fits : list of ImplicitFit
+        Top candidate fits ranked by orthogonal_r2 (descending).
+        First element is the best fit.
+    fit_order : int
+        Order in which this tuple was fitted (by MI ranking).
+
+    Notes
+    -----
+    For backward compatibility, the property `fit` returns the best fit
+    (first element of fits list, or None if no fits succeeded).
+    """
     param_names: list
     param_indices: list
     mi_score: float
-    fit: 'ImplicitFit'
+    fits: list  # list of ImplicitFit, ranked by orthogonal_r2
     fit_order: int
+
+    @property
+    def fit(self):
+        """Return best fit (first in list) for backward compatibility."""
+        return self.fits[0] if self.fits else None
 
 
 @dataclass
@@ -61,6 +86,7 @@ class DegenDetector:
         niterations: int = 40,
         max_iterations: int = 5,
         convergence_threshold: float = 0.01,
+        n_candidates: int = 5,
         verbose: bool = True,
     ) -> CouplingSearchResult:
         """Search for implicit separable degeneracies.
@@ -94,6 +120,8 @@ class DegenDetector:
             Maximum iterations for alternating optimization.
         convergence_threshold : float
             Convergence threshold for alternating optimization.
+        n_candidates : int
+            Number of candidate equations to save per tuple (from PySR hall of fame).
         verbose : bool
             Print progress information.
 
@@ -141,32 +169,35 @@ class DegenDetector:
             tuple_samples = self.samples[:, rt.param_indices]
 
             try:
-                fit = fit_separable_implicit(
+                candidate_fits = fit_separable_implicit(
                     tuple_samples,
                     rt.param_names,
                     max_complexity=max_complexity,
                     niterations=niterations,
                     max_iterations=max_iterations,
                     convergence_threshold=convergence_threshold,
+                    n_candidates=n_candidates,
                     verbose=False,
                 )
             except Exception as e:
                 if verbose:
                     print(f"  -> Fit failed: {e}")
-                fit = None
+                candidate_fits = []
 
             coupling_fit = CouplingFit(
                 param_names=rt.param_names,
                 param_indices=rt.param_indices,
                 mi_score=rt.mi_score,
-                fit=fit,
+                fits=candidate_fits,
                 fit_order=i,
             )
             fits.append(coupling_fit)
 
-            if fit is not None:
+            if candidate_fits:
+                best_fit = candidate_fits[0]
                 if verbose:
-                    print(f"  -> R²_ortho = {fit.orthogonal_r2:.4f}: {fit.equation_str}")
+                    n_success = len(candidate_fits)
+                    print(f"  -> {n_success} candidates, best R²_ortho = {best_fit.orthogonal_r2:.4f}: {best_fit.equation_str}")
             else:
                 if verbose:
                     print("  -> Fit failed")

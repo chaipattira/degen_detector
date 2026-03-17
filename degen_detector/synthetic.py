@@ -61,23 +61,24 @@ def generate_scurve_separable(n=2000, noise=0.1, seed=42):
 
     return samples, param_names, ground_truth
 
-def generate_banana_degeneracy(n=2000, noise=0.5, seed=42):
+def generate_banana_degeneracy(n=2000, seed=42):
     """Generate dataset with banana-shaped non-Gaussian degeneracy (Figure 11).
 
     From the paper (Section IV.A): P(θ1, θ2) ∝ N(√(θ₁² + 20(2θ₁² - θ₂ - 1/2)²), 1/4)
 
-    This creates a strong banana-shaped degeneracy where the constraint is:
-    θ₁² + 20(2θ₁² - θ₂ - 1/2)² ≈ 0
+    This creates a strong banana-shaped degeneracy. The posterior is Gaussian in the
+    distance from the constraint surface θ₂ = 2θ₁² - 1/2.
 
-    Solving for θ₂: θ₂ ≈ 2θ₁² - 1/2
+    Implementation uses change of variables:
+        u ~ N(0, 0.25),  v ~ N(0, 0.0125)
+        θ₁ = u,  θ₂ = v + 2u² - 0.5
+
+    This makes d² = θ₁² + 20(2θ₁² - θ₂ - 1/2)² = u² + 20v² separable.
 
     Parameters
     ----------
     n : int
         Number of samples to generate.
-    noise : float
-        Standard deviation of Gaussian noise added to the constraint.
-        Default 0.25 corresponds to variance 1/16 ≈ 1/4 from the paper.
     seed : int
         Random seed for reproducibility.
 
@@ -92,12 +93,32 @@ def generate_banana_degeneracy(n=2000, noise=0.5, seed=42):
     """
     rng = np.random.default_rng(seed)
 
-    # Sample θ1 uniformly from prior range
-    theta1 = rng.uniform(-3, 3, n)
+    samples_theta1 = []
+    samples_theta2 = []
 
-    # Impose banana-shaped constraint: θ₂ = 2θ₁² - 1/2 + noise
-    # This makes θ₁² + 20(2θ₁² - θ₂ - 1/2)² ≈ 0
-    theta2 = 2 * theta1**2 - 0.5 + rng.normal(0, noise, n)
+    # Oversample to account for rejection outside prior bounds
+    n_samples = int(n * 2)
+
+    while len(samples_theta1) < n:
+        # Sample u ~ N(0, 0.25), so σ = 0.5
+        u = rng.normal(0, 0.5, n_samples)
+
+        # Sample v ~ N(0, 0.0125), so σ ≈ 0.1118
+        v = rng.normal(0, np.sqrt(0.0125), n_samples)
+
+        # Transform to (θ₁, θ₂)
+        theta1 = u
+        theta2 = v + 2 * u**2 - 0.5
+
+        # Accept only if within prior bounds [-3, 3]²
+        mask = (theta1 >= -3) & (theta1 <= 3) & (theta2 >= -3) & (theta2 <= 3)
+
+        samples_theta1.extend(theta1[mask].tolist())
+        samples_theta2.extend(theta2[mask].tolist())
+
+    # Trim to exact size
+    samples_theta1 = np.array(samples_theta1[:n])
+    samples_theta2 = np.array(samples_theta2[:n])
 
     # Add independent parameters
     a = rng.normal(0, 1, n)
@@ -106,7 +127,7 @@ def generate_banana_degeneracy(n=2000, noise=0.5, seed=42):
     d = rng.normal(0, 1, n)
     e = rng.normal(0, 1, n)
 
-    samples = np.column_stack([theta1, theta2, a, b, c_param, d, e])
+    samples = np.column_stack([samples_theta1, samples_theta2, a, b, c_param, d, e])
     param_names = ['theta1', 'theta2', 'a', 'b', 'c', 'd', 'e']
 
     ground_truth = {
@@ -120,24 +141,26 @@ def generate_banana_degeneracy(n=2000, noise=0.5, seed=42):
     return samples, param_names, ground_truth
 
 
-def generate_cubic_degeneracy(n=2000, noise=0.5, seed=42):
+def generate_cubic_degeneracy(n=2000, seed=42):
     """Generate dataset with cubic degeneracy and informative prior (Figure 12).
 
     From the paper (Section IV.B): P(θ1, θ2) ∝ N(θ1 - (10θ2)³, 1/2)
 
-    This creates a non-linear degeneracy with constraint:
-    θ1 - (10θ2)³ ≈ 0
+    This creates a non-linear degeneracy with constraint θ1 = (10θ2)³.
+    The posterior is Gaussian in the residual θ1 - (10θ2)³.
 
-    The prior is informative with θ₁ ∈ [-2, 2] and θ₂ ∈ [-0.2, 0.2].
-    One parameter is fully prior constrained.
+    The prior is informative with θ₁ ∈ [-2, 2] and θ₂ ∈ [-0.1, 0.1].
+    Note: Paper says θ₂ ∈ [-0.1, 0.1], not [-0.2, 0.2].
+
+    Implementation:
+        Sample θ₂ ~ Uniform([-0.1, 0.1])
+        Sample θ₁ | θ₂ ~ N((10θ₂)³, 0.5)
+        Reject if θ₁ ∉ [-2, 2]
 
     Parameters
     ----------
     n : int
         Number of samples to generate.
-    noise : float
-        Standard deviation of Gaussian noise. Default sqrt(0.5) ≈ 0.707
-        corresponds to variance 1/2 from the paper.
     seed : int
         Random seed for reproducibility.
 
@@ -152,14 +175,30 @@ def generate_cubic_degeneracy(n=2000, noise=0.5, seed=42):
     """
     rng = np.random.default_rng(seed)
 
-    # Sample θ2 uniformly from tight prior range (informative prior)
-    theta2 = rng.uniform(-0.2, 0.2, n)
+    samples_theta1 = []
+    samples_theta2 = []
 
-    # Impose cubic constraint: θ1 = (10θ2)³ + noise
-    theta1 = (10 * theta2)**3 + rng.normal(0, noise, n)
+    # Oversample to account for rejection outside prior bounds
+    n_samples = int(n * 1.5)  # Minimal rejection expected
 
-    # Clip theta1 to respect its prior bounds
-    theta1 = np.clip(theta1, -2, 2)
+    while len(samples_theta1) < n:
+        # Sample θ₂ from uniform prior
+        theta2 = rng.uniform(-0.1, 0.1, n_samples)
+
+        # Sample θ₁ from conditional Gaussian: θ₁ | θ₂ ~ N((10θ₂)³, 0.5)
+        mean = (10 * theta2)**3
+        std = np.sqrt(0.5)
+        theta1 = rng.normal(mean, std)
+
+        # Accept only if within prior bounds
+        mask = (theta1 >= -2) & (theta1 <= 2)
+
+        samples_theta1.extend(theta1[mask].tolist())
+        samples_theta2.extend(theta2[mask].tolist())
+
+    # Trim to exact size
+    samples_theta1 = np.array(samples_theta1[:n])
+    samples_theta2 = np.array(samples_theta2[:n])
 
     # Add independent parameters
     a = rng.normal(0, 1, n)
@@ -168,13 +207,13 @@ def generate_cubic_degeneracy(n=2000, noise=0.5, seed=42):
     d = rng.normal(0, 1, n)
     e = rng.normal(0, 1, n)
 
-    samples = np.column_stack([theta1, theta2, a, b, c, d, e])
+    samples = np.column_stack([samples_theta1, samples_theta2, a, b, c, d, e])
     param_names = ['theta1', 'theta2', 'a', 'b', 'c', 'd', 'e']
 
     ground_truth = {
         'equation': 'theta1 - (10*theta2)^3 ≈ 0',
         'constraint': 'theta1 ≈ (10*theta2)^3',
-        'prior_range': 'theta1 ∈ [-2, 2], theta2 ∈ [-0.2, 0.2]',
+        'prior_range': 'theta1 ∈ [-2, 2], theta2 ∈ [-0.1, 0.1]',
         'degenerate_params': ['theta1', 'theta2'],
         'figure': 'Figure 12 - Cubic degeneracy with informative prior'
     }
