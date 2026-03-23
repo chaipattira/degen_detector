@@ -55,9 +55,8 @@ class FitAnalyzer:
                 # Cache coefficients for linear and quadratic (solvable analytically)
                 if degree <= 2:
                     coeffs = poly.all_coeffs()
-                    # Pad with zeros: [a, b, c] for ax² + bx + c
-                    while len(coeffs) < 3:
-                        coeffs.append(0)
+                    # Pad with leading zeros: [a, b, c] for ax² + bx + c
+                    coeffs = [0] * (3 - len(coeffs)) + list(coeffs)
                     self._poly_coeffs[pname] = tuple(float(c) for c in coeffs)
             except (sp.PolynomialError, sp.GeneratorsNeeded):
                 # Transcendental function (exp, log, etc.)
@@ -553,16 +552,14 @@ def plot_manifold_2d(analyzer, samples, param_names):
     x_range = np.linspace(x.min(), x.max(), 200)
 
     try:
-        # Always pass bounds to select correct root for quadratic solutions
-        y_bounds = (y.min(), y.max())
         if analyzer.can_solve_analytically(p2):
             # Analytic solution
-            y_fitted = analyzer.solve_for_param(p2, {p1: x_range}, bounds=y_bounds)
+            y_fitted = analyzer.solve_for_param(p2, {p1: x_range})
             ax.plot(x_range, y_fitted, 'r-', linewidth=3,
                     label=f'Fitted (R²_ortho={fit.orthogonal_r2:.3f})', zorder=3)
         else:
             # Numerical solution
-            y_fitted = analyzer.solve_for_param(p2, {p1: x_range}, bounds=y_bounds)
+            y_fitted = analyzer.solve_for_param(p2, {p1: x_range}, bounds=(y.min(), y.max()))
             valid = np.isfinite(y_fitted)
             if np.sum(valid) > 10:
                 ax.plot(x_range[valid], y_fitted[valid], 'r-', linewidth=3,
@@ -636,14 +633,13 @@ def plot_manifold_3d(analyzer, samples, param_names):
         y_range = np.linspace(y.min(), y.max(), 50)
         X_grid, Y_grid = np.meshgrid(x_range, y_range)
 
-        # Always pass bounds to select correct root for quadratic solutions
-        z_bounds = (z.min(), z.max())
         if analyzer.can_solve_analytically(p3):
-            # Analytic solution (linear or quadratic g3)
-            Z_grid = analyzer.solve_for_param(p3, {p1: X_grid, p2: Y_grid}, bounds=z_bounds)
+            # Analytic solution (linear g3)
+            Z_grid = analyzer.solve_for_param(p3, {p1: X_grid, p2: Y_grid})
         else:
             # Numerical solution (non-linear g3)
-            Z_grid = analyzer.solve_for_param(p3, {p1: X_grid, p2: Y_grid}, bounds=z_bounds)
+            Z_grid = analyzer.solve_for_param(p3, {p1: X_grid, p2: Y_grid},
+                                               bounds=(z.min(), z.max()))
 
         # Check if we got valid solutions
         valid_frac = np.sum(np.isfinite(Z_grid)) / Z_grid.size
@@ -673,7 +669,10 @@ def plot_manifold_3d(analyzer, samples, param_names):
 
 
 def plot_projections_3d(analyzer, samples, param_names):
-    """Plot 2D projections of 3-parameter constraint.
+    """Plot 2D projections of 3-parameter constraint with fitted curves.
+
+    For each 2D projection, overlays the fitted constraint curve by holding
+    the third variable at representative values (median and quartiles).
 
     Parameters
     ----------
@@ -705,29 +704,106 @@ def plot_projections_3d(analyzer, samples, param_names):
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    # Panel 1: p1 vs p3
+    # Define representative values for held-constant parameters
+    x_median = np.median(x)
+    y_median = np.median(y)
+    z_median = np.median(z)
+
+    # Quartiles for drawing multiple curves
+    x_q25, x_q75 = np.percentile(x, [25, 75])
+    y_q25, y_q75 = np.percentile(y, [25, 75])
+    z_q25, z_q75 = np.percentile(z, [25, 75])
+
+    # Panel 1: p1 vs p3 (holding p2 at median and quartiles)
     ax = axes[0]
-    ax.scatter(x, z, alpha=0.4, s=5, c='steelblue')
+    ax.scatter(x, z, alpha=0.4, s=5, c='steelblue', label='Data')
+
+    # Plot fitted curves for different p2 values
+    x_range = np.linspace(x.min(), x.max(), 200)
+    curve_styles = [
+        (y_q25, '--', 0.6, f'{p2}=Q25'),
+        (y_median, '-', 1.0, f'{p2}=median'),
+        (y_q75, '--', 0.6, f'{p2}=Q75'),
+    ]
+
+    try:
+        for p2_val, ls, alpha, label in curve_styles:
+            if analyzer.can_solve_analytically(p3):
+                z_fitted = analyzer.solve_for_param(p3, {p1: x_range, p2: p2_val})
+            else:
+                z_fitted = analyzer.solve_for_param(p3, {p1: x_range, p2: p2_val},
+                                                     bounds=(z.min(), z.max()))
+            valid = np.isfinite(z_fitted)
+            if np.sum(valid) > 10:
+                ax.plot(x_range[valid], z_fitted[valid], 'r', ls=ls, lw=2, alpha=alpha, label=label)
+    except Exception:
+        pass  # Skip curve if solving fails
+
     ax.set_xlabel(p1, fontsize=12)
     ax.set_ylabel(p3, fontsize=12)
     ax.set_title(f'{p1} vs {p3}', fontsize=11)
+    ax.legend(loc='best', fontsize=8)
     ax.grid(True, alpha=0.3)
 
-    # Panel 2: p2 vs p3
+    # Panel 2: p2 vs p3 (holding p1 at median and quartiles)
     ax = axes[1]
-    ax.scatter(y, z, alpha=0.4, s=5, c='steelblue')
+    ax.scatter(y, z, alpha=0.4, s=5, c='steelblue', label='Data')
+
+    y_range = np.linspace(y.min(), y.max(), 200)
+    curve_styles = [
+        (x_q25, '--', 0.6, f'{p1}=Q25'),
+        (x_median, '-', 1.0, f'{p1}=median'),
+        (x_q75, '--', 0.6, f'{p1}=Q75'),
+    ]
+
+    try:
+        for p1_val, ls, alpha, label in curve_styles:
+            if analyzer.can_solve_analytically(p3):
+                z_fitted = analyzer.solve_for_param(p3, {p1: p1_val, p2: y_range})
+            else:
+                z_fitted = analyzer.solve_for_param(p3, {p1: p1_val, p2: y_range},
+                                                     bounds=(z.min(), z.max()))
+            valid = np.isfinite(z_fitted)
+            if np.sum(valid) > 10:
+                ax.plot(y_range[valid], z_fitted[valid], 'r', ls=ls, lw=2, alpha=alpha, label=label)
+    except Exception:
+        pass
+
     ax.set_xlabel(p2, fontsize=12)
     ax.set_ylabel(p3, fontsize=12)
     ax.set_title(f'{p2} vs {p3}', fontsize=11)
+    ax.legend(loc='best', fontsize=8)
     ax.grid(True, alpha=0.3)
 
-    # Panel 3: p1 vs p2 colored by p3
+    # Panel 3: p1 vs p2 with contour lines for different p3 values
     ax = axes[2]
     scatter = ax.scatter(x, y, c=z, cmap='viridis', alpha=0.6, s=10)
     ax.set_xlabel(p1, fontsize=12)
     ax.set_ylabel(p2, fontsize=12)
+
+    # Draw contour lines by solving for p2 at fixed p3 values
+    x_grid = np.linspace(x.min(), x.max(), 200)
+    contour_z_vals = [z_q25, z_median, z_q75]
+    contour_styles = ['--', '-', '--']
+    contour_alphas = [0.6, 1.0, 0.6]
+
+    try:
+        for z_val, ls, alpha in zip(contour_z_vals, contour_styles, contour_alphas):
+            if analyzer.can_solve_analytically(p2):
+                y_contour = analyzer.solve_for_param(p2, {p1: x_grid, p3: z_val})
+            else:
+                y_contour = analyzer.solve_for_param(p2, {p1: x_grid, p3: z_val},
+                                                      bounds=(y.min(), y.max()))
+            valid = np.isfinite(y_contour)
+            if np.sum(valid) > 10:
+                ax.plot(x_grid[valid], y_contour[valid], 'r', ls=ls, lw=2, alpha=alpha,
+                        label=f'{p3}={z_val:.2f}')
+    except Exception:
+        pass
+
     ax.set_title(f'{p1} vs {p2}\n(colored by {p3})', fontsize=11)
-    plt.colorbar(scatter, ax=ax, label=p3)
+    cbar = plt.colorbar(scatter, ax=ax, label=p3)
+    ax.legend(loc='best', fontsize=8)
     ax.grid(True, alpha=0.3)
 
     fig.suptitle(f'Fit: {fit.equation_str}', fontsize=12, y=1.02)
@@ -802,22 +878,32 @@ def format_all_equations(coupling_search_result, ground_truth=None):
         rank = i + 1
         params_str = ", ".join(cf.param_names)
 
-        if cf.fit is None:
-            lines.append(f"\n[{rank}] Parameters: ({params_str})")
-            lines.append(f"    MI score: {cf.mi_score:.4f}")
+        lines.append(f"\n[{rank}] Parameters: ({params_str})")
+        lines.append(f"    MI score: {cf.mi_score:.4f}")
+
+        if not cf.fits:
             lines.append("    Fit: FAILED")
             continue
 
         n_valid += 1
-        fit = cf.fit
-        lines.append(f"\n[{rank}] Parameters: ({params_str})")
-        lines.append(f"    MI score: {cf.mi_score:.4f}")
-        lines.append(f"    Equation: {fit.equation_str}")
-        lines.append(f"    R²_ortho: {fit.orthogonal_r2:.4f}")
-        lines.append(f"    Residual std: {fit.residual_std:.6f}")
-        lines.append("    Components:")
-        for j, (expr, pname) in enumerate(zip(fit.component_exprs, fit.param_names)):
-            lines.append(f"      g{j+1}({pname}) = {expr}")
+
+        # Count distinct functional forms among candidates for the header note
+        from degen_detector.implicit_fit import _functional_form_key, _rank_by_consensus
+        _, consensus_count, n_forms = _rank_by_consensus(cf.fits)
+
+        lines.append(
+            f"    Candidates ({len(cf.fits)} total, "
+            f"ranked by functional form consensus then R\u00b2_ortho; "
+            f"top form: {consensus_count}/{len(cf.fits)} agree, {n_forms} distinct form(s)):"
+        )
+        for k, fit in enumerate(cf.fits):
+            lines.append(f"\n    [{k+1}] {fit.equation_str}")
+            lines.append(f"        R\u00b2_ortho:    {fit.orthogonal_r2:.4f}")
+            lines.append(f"        Residual std: {fit.residual_std:.6f}")
+            lines.append(f"        Complexity:   {fit.complexity}")
+            lines.append("        Components:")
+            for j, (expr, pname) in enumerate(zip(fit.component_exprs, fit.param_names)):
+                lines.append(f"          g{j+1}({pname}) = {expr}")
 
     lines.append(f"Total: {len(coupling_search_result.fits)} fits attempted, {n_valid} successful")
     lines.append("-" * 80)
@@ -840,6 +926,50 @@ def save_equations(coupling_search_result, output_path, ground_truth=None):
     text = format_all_equations(coupling_search_result, ground_truth)
     with open(output_path, 'w') as f:
         f.write(text)
+
+
+def plot_mi_matrix(mi_result, output_path=None):
+    """Plot the mutual information matrix as a heatmap.
+
+    Parameters
+    ----------
+    mi_result : MIResult
+        Computed mutual information matrix.
+    output_path : Path or str, optional
+        If provided, save the figure to this path.
+
+    Returns
+    -------
+    fig : matplotlib.Figure
+    """
+    import matplotlib.pyplot as plt
+
+    n = len(mi_result.param_names)
+    figsize = (max(6, n), max(5, n - 1))
+    fig, ax = plt.subplots(figsize=figsize)
+
+    im = ax.imshow(mi_result.mi_matrix, cmap='viridis', aspect='auto')
+    plt.colorbar(im, ax=ax, label='Mutual Information (nats)')
+
+    ax.set_xticks(range(n))
+    ax.set_yticks(range(n))
+    ax.set_xticklabels(mi_result.param_names, rotation=45, ha='right', fontsize=10)
+    ax.set_yticklabels(mi_result.param_names, fontsize=10)
+
+    max_val = mi_result.mi_matrix.max()
+    for i in range(n):
+        for j in range(n):
+            val = mi_result.mi_matrix[i, j]
+            color = 'black' if val > max_val * 0.5 else 'white'
+            ax.text(j, i, f'{val:.2f}', ha='center', va='center', fontsize=8, color=color)
+
+    ax.set_title('Mutual Information Matrix', fontsize=13)
+    plt.tight_layout()
+
+    if output_path is not None:
+        fig.savefig(output_path, dpi=150, bbox_inches='tight')
+
+    return fig
 
 
 # =============================================================================
@@ -998,35 +1128,41 @@ class DiagnosticsRunner:
         print("  - Equations (all fits)")
         save_equations(result, output_dir / "equations.txt", ground_truth)
 
+        # 2. MI matrix
+        print("  - MI matrix")
+        fig = plot_mi_matrix(result.mi_result)
+        fig.savefig(output_dir / "mi_matrix.png", dpi=150, bbox_inches='tight')
+        plt.close(fig)
+
         if samples is None:
             print("  - No samples available, skipping plots")
             return
 
-        # 2. Corner plot
+        # 3. Corner plot
         print("  - Corner plot")
         fig = plot_corner(samples, param_names)
         fig.savefig(output_dir / "corner.png", dpi=150, bbox_inches='tight')
         plt.close(fig)
 
-        # 3. Component functions
+        # 4. Component functions
         print("  - Component functions")
         fig = plot_components(analyzer, samples, param_names)
         fig.savefig(output_dir / "components.png", dpi=150, bbox_inches='tight')
         plt.close(fig)
 
-        # 4. True vs predicted
+        # 5. True vs predicted
         print("  - True vs predicted")
         fig = plot_true_vs_predicted(analyzer, samples, param_names)
         fig.savefig(output_dir / "true_vs_predicted.png", dpi=150, bbox_inches='tight')
         plt.close(fig)
 
-        # 5. Residuals
+        # 6. Residuals
         print("  - Residuals")
         fig = plot_residuals(analyzer, samples, param_names)
         fig.savefig(output_dir / "residuals.png", dpi=150, bbox_inches='tight')
         plt.close(fig)
 
-        # 6. Manifold plot (2D or 3D based on param count)
+        # 7. Manifold plot (2D or 3D based on param count)
         n_fit_params = len(best_fit.param_names)
         if n_fit_params == 2:
             print("  - 2D manifold")

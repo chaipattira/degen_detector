@@ -1,3 +1,6 @@
+# ABOUTME: Synthetic dataset generators for testing separable implicit degeneracy detection.
+# ABOUTME: Each generator produces samples following g1(x1) + ... + gk(xk) = c with known ground truth.
+
 """Synthetic dataset generators with known separable implicit degeneracies.
 
 This module generates test datasets where parameters follow the separable form:
@@ -6,7 +9,7 @@ This module generates test datasets where parameters follow the separable form:
 
 import numpy as np
 
-def generate_scurve_separable(n=2000, noise=0.1, seed=42):
+def generate_scurve_separable(n=2000, noise=0.2, seed=42):
     """Generate dataset with S-curve separable degeneracy: (x^3 - 3x) + y + z = 0.
 
     Uses cubic function to create a pronounced S-curve constraint in the x-z plane.
@@ -62,18 +65,21 @@ def generate_scurve_separable(n=2000, noise=0.1, seed=42):
     return samples, param_names, ground_truth
 
 def generate_banana_degeneracy(n=2000, seed=42):
-    """Generate dataset with banana-shaped non-Gaussian degeneracy (Figure 11).
+    """Generate dataset with 3D paraboloid surface degeneracy.
 
-    From the paper (Section IV.A): P(θ1, θ2) ∝ N(√(θ₁² + 20(2θ₁² - θ₂ - 1/2)²), 1/4)
+    Extends the 2D banana degeneracy to a 2D surface embedded in 3D space.
+    The constraint is: 2θ₁² + θ₂² - θ₃ = 0.5
 
-    This creates a strong banana-shaped degeneracy. The posterior is Gaussian in the
-    distance from the constraint surface θ₂ = 2θ₁² - 1/2.
+    This creates an elliptic paraboloid (bowl-shaped) surface that preserves
+    the characteristic quadratic curvature of the banana in the θ₁ direction.
+
+    Separable form: g₁(θ₁) + g₂(θ₂) + g₃(θ₃) = c
+        where g₁(θ₁) = 2θ₁², g₂(θ₂) = θ₂², g₃(θ₃) = -θ₃, c = 0.5
 
     Implementation uses change of variables:
-        u ~ N(0, 0.25),  v ~ N(0, 0.0125)
-        θ₁ = u,  θ₂ = v + 2u² - 0.5
-
-    This makes d² = θ₁² + 20(2θ₁² - θ₂ - 1/2)² = u² + 20v² separable.
+        θ₁ ~ N(0, 0.5), θ₂ ~ N(0, 0.5)
+        w ~ N(0, 0.0125)  (noise perpendicular to surface)
+        θ₃ = 2θ₁² + θ₂² - 0.5 + w
 
     Parameters
     ----------
@@ -87,7 +93,7 @@ def generate_banana_degeneracy(n=2000, seed=42):
     samples : ndarray
         Array of shape (n, 7) containing all parameter samples.
     param_names : list of str
-        Names of the parameters: ['theta1', 'theta2', 'a', 'b', 'c', 'd', 'e'].
+        Names of the parameters: ['theta1', 'theta2', 'theta3', 'a', 'b', 'c', 'd'].
     ground_truth : dict
         Dictionary containing equation, constraint, and degenerate_params.
     """
@@ -95,68 +101,68 @@ def generate_banana_degeneracy(n=2000, seed=42):
 
     samples_theta1 = []
     samples_theta2 = []
+    samples_theta3 = []
 
     # Oversample to account for rejection outside prior bounds
     n_samples = int(n * 2)
 
     while len(samples_theta1) < n:
-        # Sample u ~ N(0, 0.25), so σ = 0.5
-        u = rng.normal(0, 0.5, n_samples)
+        # Sample θ₁, θ₂ from Gaussian (similar spread to 2D banana)
+        theta1 = rng.normal(0, 0.5, n_samples)
+        theta2 = rng.normal(0, 0.5, n_samples)
 
-        # Sample v ~ N(0, 0.0125), so σ ≈ 0.1118
-        v = rng.normal(0, np.sqrt(0.0125), n_samples)
+        # Sample noise perpendicular to the surface
+        w = rng.normal(0, np.sqrt(0.0125), n_samples)
 
-        # Transform to (θ₁, θ₂)
-        theta1 = u
-        theta2 = v + 2 * u**2 - 0.5
+        # Compute θ₃ from constraint: θ₃ = 2θ₁² + θ₂² - 0.5 + noise
+        theta3 = 2 * theta1**2 + theta2**2 - 0.5 + w
 
-        # Accept only if within prior bounds [-3, 3]²
-        mask = (theta1 >= -3) & (theta1 <= 3) & (theta2 >= -3) & (theta2 <= 3)
+        # Accept only if within prior bounds [-3, 3]³
+        mask = (
+            (theta1 >= -3) & (theta1 <= 3) &
+            (theta2 >= -3) & (theta2 <= 3) &
+            (theta3 >= -3) & (theta3 <= 3)
+        )
 
         samples_theta1.extend(theta1[mask].tolist())
         samples_theta2.extend(theta2[mask].tolist())
+        samples_theta3.extend(theta3[mask].tolist())
 
     # Trim to exact size
     samples_theta1 = np.array(samples_theta1[:n])
     samples_theta2 = np.array(samples_theta2[:n])
+    samples_theta3 = np.array(samples_theta3[:n])
 
     # Add independent parameters
     a = rng.normal(0, 1, n)
     b = rng.normal(0, 1, n)
     c_param = rng.normal(0, 1, n)
     d = rng.normal(0, 1, n)
-    e = rng.normal(0, 1, n)
 
-    samples = np.column_stack([samples_theta1, samples_theta2, a, b, c_param, d, e])
-    param_names = ['theta1', 'theta2', 'a', 'b', 'c', 'd', 'e']
+    samples = np.column_stack([samples_theta1, samples_theta2, samples_theta3, a, b, c_param, d])
+    param_names = ['theta1', 'theta2', 'theta3', 'a', 'b', 'c', 'd']
 
     ground_truth = {
-        'equation': 'theta1^2 + 20(2*theta1^2 - theta2 - 0.5)^2 ≈ 0',
-        'constraint': 'theta2 ≈ 2*theta1^2 - 0.5',
-        'prior_range': 'theta1, theta2 ∈ [-3, 3]',
-        'degenerate_params': ['theta1', 'theta2'],
-        'figure': 'Figure 11 - Banana-shaped non-Gaussian degeneracy'
+        'equation': '2*theta1^2 + theta2^2 - theta3 = 0.5',
+        'constraint': 'theta3 ≈ 2*theta1^2 + theta2^2 - 0.5',
+        'component_functions': ['g1(theta1) = 2*theta1^2', 'g2(theta2) = theta2^2', 'g3(theta3) = -theta3'],
+        'constant': 0.5,
+        'prior_range': 'theta1, theta2, theta3 ∈ [-3, 3]',
+        'degenerate_params': ['theta1', 'theta2', 'theta3'],
+        'surface_type': 'Elliptic paraboloid (3D extension of banana)'
     }
 
     return samples, param_names, ground_truth
 
 
 def generate_cubic_degeneracy(n=2000, seed=42):
-    """Generate dataset with cubic degeneracy and informative prior (Figure 12).
+    """Generate dataset with cubic degeneracy (Figure 12).
 
-    From the paper (Section IV.B): P(θ1, θ2) ∝ N(θ1 - (10θ2)³, 1/2)
+    Inspired by the paper (Section IV.B): P(θ1, θ2) ∝ N(θ1 - (10θ2)³, σ²)
 
-    This creates a non-linear degeneracy with constraint θ1 = (10θ2)³.
-    The posterior is Gaussian in the residual θ1 - (10θ2)³.
-
-    The prior is informative with θ₁ ∈ [-2, 2] and θ₂ ∈ [-0.1, 0.1].
-    Note: Paper says θ₂ ∈ [-0.1, 0.1], not [-0.2, 0.2].
-
-    Implementation:
-        Sample θ₂ ~ Uniform([-0.1, 0.1])
-        Sample θ₁ | θ₂ ~ N((10θ₂)³, 0.5)
-        Reject if θ₁ ∉ [-2, 2]
-
+    Constraint: θ1 = (10θ2)³, creating a strongly nonlinear separable degeneracy.
+    θ₂ ∈ [-0.1, 0.1] so the cubic value (10*0.1)^3 = 1 stays within the θ1 prior
+    [-2, 2] without truncation.
     Parameters
     ----------
     n : int
@@ -175,30 +181,8 @@ def generate_cubic_degeneracy(n=2000, seed=42):
     """
     rng = np.random.default_rng(seed)
 
-    samples_theta1 = []
-    samples_theta2 = []
-
-    # Oversample to account for rejection outside prior bounds
-    n_samples = int(n * 1.5)  # Minimal rejection expected
-
-    while len(samples_theta1) < n:
-        # Sample θ₂ from uniform prior
-        theta2 = rng.uniform(-0.1, 0.1, n_samples)
-
-        # Sample θ₁ from conditional Gaussian: θ₁ | θ₂ ~ N((10θ₂)³, 0.5)
-        mean = (10 * theta2)**3
-        std = np.sqrt(0.5)
-        theta1 = rng.normal(mean, std)
-
-        # Accept only if within prior bounds
-        mask = (theta1 >= -2) & (theta1 <= 2)
-
-        samples_theta1.extend(theta1[mask].tolist())
-        samples_theta2.extend(theta2[mask].tolist())
-
-    # Trim to exact size
-    samples_theta1 = np.array(samples_theta1[:n])
-    samples_theta2 = np.array(samples_theta2[:n])
+    theta2 = rng.uniform(-0.1, 0.1, n)
+    theta1 = (10 * theta2)**3 + rng.normal(0, 0.15, n)
 
     # Add independent parameters
     a = rng.normal(0, 1, n)
@@ -207,7 +191,7 @@ def generate_cubic_degeneracy(n=2000, seed=42):
     d = rng.normal(0, 1, n)
     e = rng.normal(0, 1, n)
 
-    samples = np.column_stack([samples_theta1, samples_theta2, a, b, c, d, e])
+    samples = np.column_stack([theta1, theta2, a, b, c, d, e])
     param_names = ['theta1', 'theta2', 'a', 'b', 'c', 'd', 'e']
 
     ground_truth = {
@@ -221,7 +205,7 @@ def generate_cubic_degeneracy(n=2000, seed=42):
     return samples, param_names, ground_truth
 
 
-def generate_trig_separable(n=2000, noise=0.1, seed=42):
+def generate_trig_separable(n=2000, noise=0.2, seed=42):
     """Generate dataset with trigonometric functions (separable): sin(x) + cos(y) - z = 1.
 
     Combines trigonometric functions to test whether the detector can identify
@@ -248,9 +232,9 @@ def generate_trig_separable(n=2000, noise=0.1, seed=42):
     rng = np.random.default_rng(seed)
 
     c = 1.0
-    x = rng.uniform(0, 2 * np.pi, n)
-    y = rng.uniform(0, 2 * np.pi, n)
-    z = np.sin(x) + np.cos(y) - c + rng.normal(0, noise, n)
+    x = rng.uniform(0, 2 * np.pi, n) + rng.normal(0, noise, n)
+    y = rng.uniform(0, 2 * np.pi, n) + rng.normal(0, noise, n)
+    z = 2 * np.sin(x) + np.cos(y) - c + rng.normal(0, noise, n)
 
     a = rng.normal(0, 1, n)
     b = rng.normal(0, 1, n)
@@ -261,8 +245,8 @@ def generate_trig_separable(n=2000, noise=0.1, seed=42):
     param_names = ['x', 'y', 'z', 'a', 'b', 'c', 'd']
 
     ground_truth = {
-        'equation': 'sin(x) + cos(y) - z = 1',
-        'component_functions': ['g1(x) = sin(x)', 'g2(y) = cos(y)', 'g3(z) = -z'],
+        'equation': '2*sin(x) + cos(y) - z = 1',
+        'component_functions': ['g1(x) = 2*sin(x)', 'g2(y) = cos(y)', 'g3(z) = -z'],
         'constant': c,
         'degenerate_params': ['x', 'y', 'z']
     }

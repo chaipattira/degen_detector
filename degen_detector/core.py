@@ -1,3 +1,6 @@
+# ABOUTME: Main API for the degen_detector package — DegenDetector class and result types.
+# ABOUTME: Orchestrates MI ranking and symbolic fitting to find separable parameter degeneracies.
+
 """Main API for implicit separable degeneracy detection."""
 
 from dataclasses import dataclass
@@ -27,21 +30,16 @@ class CouplingFit:
         First element is the best fit.
     fit_order : int
         Order in which this tuple was fitted (by MI ranking).
-
-    Notes
-    -----
-    For backward compatibility, the property `fit` returns the best fit
-    (first element of fits list, or None if no fits succeeded).
     """
     param_names: list
     param_indices: list
     mi_score: float
-    fits: list  # list of ImplicitFit, ranked by orthogonal_r2
+    fits: list  # list of ImplicitFit, ranked by orthogonal_r2 (descending)
     fit_order: int
 
     @property
     def fit(self):
-        """Return best fit (first in list) for backward compatibility."""
+        """Best fit by orthogonal_r2 (first in ranked list)."""
         return self.fits[0] if self.fits else None
 
 
@@ -177,7 +175,7 @@ class DegenDetector:
                     max_iterations=max_iterations,
                     convergence_threshold=convergence_threshold,
                     n_candidates=n_candidates,
-                    verbose=False,
+                    verbose=True,
                 )
             except Exception as e:
                 if verbose:

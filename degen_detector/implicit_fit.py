@@ -1,3 +1,6 @@
+# ABOUTME: Separable implicit surface fitting via alternating optimization and PySR.
+# ABOUTME: Finds g1(x1) + g2(x2) + ... + gk(xk) = c using 1D symbolic regression per component.
+
 """Separable implicit surface fitting using alternating optimization.
 
 This module finds functions g1, g2, ..., gk and constant c such that:
@@ -17,6 +20,7 @@ The algorithm uses alternating optimization:
 3. Transform expressions back to original coordinates
 """
 
+from collections import Counter
 from dataclasses import dataclass
 
 import numpy as np
@@ -24,6 +28,120 @@ import sympy
 from pysr import PySRRegressor
 
 from degen_detector.loss import compute_orthogonal_r2
+
+
+def _polynomial_r2(x_predictor: np.ndarray, x_response: np.ndarray, max_degree: int) -> float:
+    """R² of polynomial regression: x_response ~ f(x_predictor), degree <= max_degree.
+
+    Uses ordinary least squares with polynomial features [x, x^2, ..., x^max_degree].
+    """
+    n = len(x_predictor)
+    X = np.column_stack([np.ones(n)] + [x_predictor**d for d in range(1, max_degree + 1)])
+    coef, _, _, _ = np.linalg.lstsq(X, x_response, rcond=None)
+    ss_res = np.sum((x_response - X @ coef) ** 2)
+    ss_tot = np.sum((x_response - np.mean(x_response)) ** 2)
+    return float(1.0 - ss_res / ss_tot) if ss_tot > 1e-12 else 0.0
+
+
+def _compute_nonlinearity_scores(X_norm: np.ndarray, max_degree: int = 4) -> np.ndarray:
+    """Compute nonlinearity score for each variable using polynomial predictability.
+
+    For each pair (i, j), measures R²(xi ~ poly(xj)) and R²(xj ~ poly(xi)).
+    A high R² for xj predicting xi means xi is well-expressed as a polynomial
+    of xj, so xj carries the polynomial function and should be fitted first.
+
+    This correctly distinguishes, e.g., theta1 = (10*theta2)^3 by observing that
+    R²(theta1 ~ poly3(theta2)) ≈ 1 while R²(theta2 ~ poly3(theta1)) << 1
+    (cube root is not polynomial), so theta2 is identified as the cubic variable.
+
+    Parameters
+    ----------
+    X_norm : ndarray of shape (n_samples, k)
+        Normalized data matrix.
+    max_degree : int
+        Maximum polynomial degree to test.
+
+    Returns
+    -------
+    scores : ndarray of shape (k,)
+        Nonlinearity score per variable. Higher = should be fitted first.
+    """
+    k = X_norm.shape[1]
+    if k == 1:
+        return np.zeros(1)
+
+    scores = np.zeros(k)
+    for i in range(k):
+        for j in range(i + 1, k):
+            x_i, x_j = X_norm[:, i], X_norm[:, j]
+            # High R² here means xj predicts xi polynomially → xj carries the function
+            scores[j] += _polynomial_r2(x_j, x_i, max_degree)
+            scores[i] += _polynomial_r2(x_i, x_j, max_degree)
+
+    return scores
+
+
+def _total_ops(fit):
+    """Total sympy operation count across all component expressions."""
+    return sum(sympy.count_ops(e) for e in fit.component_exprs)
+
+
+def _functional_form_key(expr, var_name):
+    """Canonical key for functional structure, ignoring numeric constants.
+
+    For polynomial expressions, returns the frozenset of non-zero degrees.
+    For non-polynomial expressions (exp, log, etc.), replaces all numeric
+    atoms with a placeholder symbol and uses the resulting structure string.
+    """
+    var = sympy.Symbol(var_name)
+    try:
+        poly = sympy.Poly(sympy.expand(expr), var)
+        return ('poly', frozenset(d[0] for d in poly.monoms()))
+    except (sympy.PolynomialError, sympy.GeneratorsNeeded, Exception):
+        C = sympy.Symbol('_C')
+        form = expr
+        for atom in sorted(expr.atoms(sympy.Number), key=lambda x: abs(float(x))):
+            form = form.subs(atom, C)
+        return ('nonpoly', str(form))
+
+
+def _rank_by_consensus(candidates):
+    """Re-rank candidates so the most common functional form appears first.
+
+    Computes a functional form key for each candidate (ignoring numeric
+    constants), counts how many candidates share each form, then sorts so
+    the most-common form group comes first. Within each group, sorts by
+    orthogonal_r2 (descending), breaking ties by complexity (ascending).
+
+    Returns
+    -------
+    ranked : list of ImplicitFit
+        Re-ranked candidates.
+    consensus_count : int
+        How many of the input candidates matched the winning form.
+    n_forms : int
+        Total number of distinct functional forms found.
+    """
+    form_keys = [
+        tuple(
+            _functional_form_key(expr, pname)
+            for expr, pname in zip(fit.component_exprs, fit.param_names)
+        )
+        for fit in candidates
+    ]
+
+    counts = Counter(form_keys)
+    most_common_form, consensus_count = counts.most_common(1)[0]
+
+    def sort_key(idx):
+        return (
+            0 if form_keys[idx] == most_common_form else 1,
+            -candidates[idx].orthogonal_r2,
+            _total_ops(candidates[idx]),
+        )
+
+    ranked = [candidates[i] for i in sorted(range(len(candidates)), key=sort_key)]
+    return ranked, consensus_count, len(counts)
 
 
 @dataclass
@@ -40,6 +158,7 @@ class ImplicitFit:
     residual_std: float
     orthogonal_r2: float
     equation_str: str
+    complexity: int  # total sympy operation count across all component expressions
 
     def evaluate(self, X: np.ndarray) -> np.ndarray:
         """Compute sum of gj(xj) - c for each point.
@@ -90,12 +209,12 @@ def _make_pysr_model_1d(max_complexity: int, niterations: int) -> PySRRegressor:
     cosmological degeneracies. Exponential operator heavily penalized.
     """
     return PySRRegressor(
-        binary_operators=["+", "*"],
-        unary_operators=["exp"],  # Added cube operator for cubic degeneracies
+        binary_operators=["+", "-", "*"],
+        unary_operators=["square", "exp", "cube"],
         maxsize=max_complexity,
         niterations=niterations,
         parsimony=0.01,  # Favor simpler expressions
-        constraints={"exp": 2},  # cube costs 3 complexity units 
+        constraints={"exp": 6, "square": 2, "cube": 2},
         deterministic=True,
         parallelism='serial',
         random_state=42,
@@ -163,6 +282,22 @@ def fit_separable_implicit(
     X_std = np.where(X_std < 1e-12, 1.0, X_std)
     X_norm = (samples - X_mean) / X_std
 
+    # Determine optimal variable ordering based on nonlinearity scores
+    # Most nonlinear variables should be fitted first
+    nonlin_scores = _compute_nonlinearity_scores(X_norm)
+    order = np.argsort(nonlin_scores)[::-1]  # descending: most nonlinear first
+    inverse_order = np.argsort(order)  # to map back to original order
+
+    if verbose:
+        print(f"Nonlinearity scores: {dict(zip(param_names, nonlin_scores))}")
+        print(f"Fitting order: {[param_names[i] for i in order]}")
+
+    # Reorder data and tracking arrays
+    X_norm = X_norm[:, order]
+    X_mean = X_mean[order]
+    X_std = X_std[order]
+    param_names_ordered = [param_names[i] for i in order]
+
     # Initialize: gj(xj) = xj (identity/linear)
     # Simpler, more general starting point for alternating optimization
     component_values = [X_norm[:, j].copy() for j in range(k)]
@@ -213,7 +348,7 @@ def fit_separable_implicit(
             component_values[j] = fn_j(X_norm[:, j])
 
             if verbose:
-                print(f"  Component {j} ({param_names[j]}): {expr_j}")
+                print(f"  Component {j} ({param_names_ordered[j]}): {expr_j}")
 
         # Update constant
         total = sum(component_values)
@@ -232,19 +367,26 @@ def fit_separable_implicit(
             break
 
     # Helper function to create ImplicitFit from component expressions
+    # Note: param_names is the ORIGINAL order, param_names_ordered is the fitting order
+    original_param_names = param_names  # Capture original order before any reassignment
+
     def create_implicit_fit(comp_exprs_norm, c_value):
         """Create ImplicitFit from normalized component expressions."""
-        # Transform expressions back to original coordinates
-        comp_exprs_orig = []
+        # Transform expressions back to original coordinates (in reordered space)
+        comp_exprs_reordered = []
         for j, expr in enumerate(comp_exprs_norm):
-            sym_orig = sympy.Symbol(param_names[j])
+            sym_orig = sympy.Symbol(param_names_ordered[j])
             sym_norm = sympy.Symbol(f"z{j}")
-            # zj = (xj - mu_j) / sigma_j
+            # zj = (xj - mu_j) / sigma_j (X_mean/X_std are already reordered)
             substitution = (sym_orig - X_mean[j]) / X_std[j]
             expr_orig = expr.subs(sym_norm, substitution)
-            comp_exprs_orig.append(sympy.simplify(expr_orig))
+            comp_exprs_reordered.append(sympy.simplify(expr_orig))
 
-        # Build equation string
+        # Reorder expressions back to original parameter order
+        # inverse_order[i] gives the reordered position of original index i
+        comp_exprs_orig = [comp_exprs_reordered[inverse_order[i]] for i in range(k)]
+
+        # Build equation string (in original parameter order)
         terms = []
         for expr in comp_exprs_orig:
             term_str = str(expr)
@@ -254,7 +396,7 @@ def fit_separable_implicit(
                 terms.append(term_str)
         equation_str = " + ".join(terms) + f" = {c_value:.4f}"
 
-        # Compute residual_std in normalized space
+        # Compute residual_std in normalized space (still in reordered space)
         comp_vals_norm = []
         for j, expr in enumerate(comp_exprs_norm):
             sym_j = sympy.Symbol(f"z{j}")
@@ -265,17 +407,21 @@ def fit_separable_implicit(
         res_std = float(np.std(residual_norm))
 
         # Compute orthogonal R^2 using the implicit surface loss
+        # comp_exprs_orig is in original order, samples is in original order
         orthogonal_r2 = compute_orthogonal_r2(
-            comp_exprs_orig, param_names, samples, c=c_value, normalize=False
+            comp_exprs_orig, original_param_names, samples, c=c_value, normalize=False
         )
+
+        complexity = int(sum(sympy.count_ops(e) for e in comp_exprs_orig))
 
         return ImplicitFit(
             component_exprs=comp_exprs_orig,
             constant=c_value,
-            param_names=param_names,
+            param_names=list(original_param_names),
             residual_std=res_std,
             orthogonal_r2=orthogonal_r2,
             equation_str=equation_str,
+            complexity=complexity,
         )
 
     # Generate candidate fits by exploring PySR hall of fame
@@ -323,12 +469,19 @@ def fit_separable_implicit(
                     print(f"  Component {j} alt {alt_idx}: Failed - {e}")
                 continue
 
-    # Rank candidates by orthogonal_r2 (descending) and return top n_candidates
-    candidates.sort(key=lambda f: f.orthogonal_r2, reverse=True)
+    # First sort by R²_ortho to get top n_candidates
+    candidates.sort(key=lambda f: (-f.orthogonal_r2, _total_ops(f)))
     top_candidates = candidates[:n_candidates]
 
+    # Re-rank by functional form consensus: the most common functional form
+    # (ignoring numeric constants) is promoted to the front. Within each
+    # form group, R²_ortho (descending) and complexity (ascending) apply.
+    top_candidates, consensus_count, n_forms = _rank_by_consensus(top_candidates)
+
     if verbose:
-        print(f"\nReturning top {len(top_candidates)} fits:")
+        print(f"\nReturning top {len(top_candidates)} fits "
+              f"(consensus form: {consensus_count}/{len(top_candidates)} candidates, "
+              f"{n_forms} distinct form(s)):")
         for i, fit in enumerate(top_candidates):
             print(f"  [{i+1}] R²_ortho={fit.orthogonal_r2:.4f}, residual_std={fit.residual_std:.6f}")
 

@@ -1,3 +1,6 @@
+# ABOUTME: Orthogonal loss and R² for separable implicit surfaces F(x) = sum(gj(xj)) - c = 0.
+# ABOUTME: Measures perpendicular distance to the surface: L = mean(F² / ||grad F||²).
+
 """
 Orthogonal loss computation for separable implicit surfaces.
 

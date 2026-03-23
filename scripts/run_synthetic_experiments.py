@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ABOUTME: Runs the four synthetic degeneracy experiments and saves results as pickle files.
+# ABOUTME: Results include all candidate fits per tuple (via CouplingSearchResult) for analysis.
 """Run synthetic degeneracy experiments and save results for plotting.
 
 Four consolidated experiments test different degeneracy types:
@@ -29,6 +31,7 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from degen_detector import DegenDetector
+from degen_detector.diagnostics import DiagnosticsRunner
 from degen_detector.synthetic import (
     generate_banana_degeneracy,
     generate_cubic_degeneracy,
@@ -41,7 +44,7 @@ EXPERIMENTS = [
     {
         "name": "exp1_banana",
         "generator": generate_banana_degeneracy,
-        "coupling_depth": 2,
+        "coupling_depth": 3,
         "niterations": 200,
         "max_fits": 1,
     },
@@ -56,7 +59,7 @@ EXPERIMENTS = [
         "name": "exp3_trig",
         "generator": generate_trig_separable,
         "coupling_depth": 3,
-        "niterations": 150,
+        "niterations": 200,
         "max_fits": 1,
     },
     {
@@ -76,7 +79,7 @@ def run_experiment(exp_config, output_dir, max_fits=None):
     print(f"{'='*60}")
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Generate data (uses default n=2000, noise=0.1 from generators)
+    # Generate data
     print("Generating synthetic data...")
     samples, param_names, ground_truth = exp_config["generator"]()
 
@@ -91,12 +94,11 @@ def run_experiment(exp_config, output_dir, max_fits=None):
     print(f"  coupling_depth={exp_config['coupling_depth']}")
     print(f"  niterations={exp_config['niterations']}")
     print(f"  max_fits={max_fits}")
-    print("This may take several minutes (PySR symbolic regression)...")
 
     result = det.search_couplings(
         coupling_depth=exp_config["coupling_depth"],
         niterations=exp_config["niterations"],
-        max_complexity=20,
+        max_complexity=25,
         max_fits=max_fits,
     )
 
@@ -189,6 +191,19 @@ def main():
         else:
             print(f"{r['name']:<25} {gt_eq:<40} {'N/A':>8} {'N/A':>10}")
     print("="*80)
+
+    # Run diagnostics to generate plots
+    print("\n" + "="*80)
+    print("Running diagnostics...")
+    print("="*80)
+    try:
+        runner = DiagnosticsRunner(combined_file)
+        runner.run(output_dir=output_dir / "diagnostics")
+        print(f"\nDiagnostics complete! Plots saved to: {output_dir / 'diagnostics'}")
+    except Exception as e:
+        print(f"\nWarning: Diagnostics failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
