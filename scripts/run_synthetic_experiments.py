@@ -16,19 +16,15 @@ Results are saved as pickle files that can be loaded by notebooks for plotting.
 """
 import argparse
 import sys
-from datetime import datetime
 from pathlib import Path
 
 # Set matplotlib backend before any imports that might use it
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for headless environments
 
-try:
-    import dill as pickle  # dill can pickle lambdas from sympy.lambdify
-except ImportError:
-    import pickle
-
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from degen_detector.io import save_pickle, create_output_dir
 
 from degen_detector import DegenDetector
 from degen_detector.diagnostics import DiagnosticsRunner
@@ -145,9 +141,7 @@ def main():
     args = parser.parse_args()
 
     # Create timestamped output directory
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = args.output_dir / timestamp
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = create_output_dir(args.output_dir)
 
     print(f"Output directory: {output_dir}")
 
@@ -168,14 +162,12 @@ def main():
 
         # Save individual result
         result_file = output_dir / f"{exp_config['name']}_result.pkl"
-        with open(result_file, "wb") as f:
-            pickle.dump(result, f)
+        save_pickle(result, result_file)
         print(f"Saved: {result_file}")
 
     # Save combined results
     combined_file = output_dir / "all_results.pkl"
-    with open(combined_file, "wb") as f:
-        pickle.dump(all_results, f)
+    save_pickle(all_results, combined_file)
     print(f"\nSaved combined results: {combined_file}")
 
     # Print summary

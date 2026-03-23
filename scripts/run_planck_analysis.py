@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ABOUTME: Runs degeneracy detection on Planck 2018 ΛCDM chains and saves results for visualization.
+# ABOUTME: Loads GetDist chains, runs DegenDetector, and writes pickle output for downstream plotting.
 """Run degeneracy detection on Planck 2018 ΛCDM chains and save results for plotting.
 
 This script loads Planck MCMC chains, runs the DegenDetector algorithm to search for
@@ -11,21 +13,17 @@ Results are saved as pickle files that can be loaded by plot_planck_results.py f
 """
 import argparse
 import sys
-from datetime import datetime
 from pathlib import Path
 
 # Set matplotlib backend before any imports that might use it
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for headless environments
 
-try:
-    import dill as pickle  # dill can pickle lambdas from sympy.lambdify
-except ImportError:
-    import pickle
-
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from degen_detector.io import save_pickle, create_output_dir
 
 from degen_detector import DegenDetector
 from getdist import loadMCSamples
@@ -177,9 +175,7 @@ def main():
     param_names = args.params if args.params else ['omegam', 'H0', 'sigma8', 'ns', 'tau', 'logA']
 
     # Create timestamped output directory
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = args.output_dir / timestamp
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = create_output_dir(args.output_dir)
 
     print(f"Output directory: {output_dir}")
 
@@ -196,8 +192,7 @@ def main():
 
     # Save result
     result_file = output_dir / "planck_result.pkl"
-    with open(result_file, "wb") as f:
-        pickle.dump(result, f)
+    save_pickle(result, result_file)
     print(f"\nSaved: {result_file}")
 
     # Print summary
