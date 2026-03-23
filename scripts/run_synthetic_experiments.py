@@ -42,37 +42,32 @@ EXPERIMENTS = [
         "generator": generate_banana_degeneracy,
         "coupling_depth": 3,
         "niterations": 200,
-        "max_fits": 1,
     },
     {
         "name": "exp2_cubic",
         "generator": generate_cubic_degeneracy,
         "coupling_depth": 2,
         "niterations": 200,
-        "max_fits": 1,
     },
     {
         "name": "exp3_trig",
         "generator": generate_trig_separable,
         "coupling_depth": 3,
         "niterations": 200,
-        "max_fits": 1,
     },
     {
         "name": "exp4_scurve",
         "generator": generate_scurve_separable,
         "coupling_depth": 3,
         "niterations": 200,
-        "max_fits": 1,
     },
 ]
 
 
-def run_experiment(exp_config, output_dir, max_fits=None):
+def run_experiment(exp_config, output_dir, max_fits=1):
     """Run a single experiment and return results."""
     print(f"Running: {exp_config['name']}")
-    print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
+    
     # Generate data
     print("Generating synthetic data...")
     samples, param_names, ground_truth = exp_config["generator"]()
@@ -132,8 +127,8 @@ def main():
     parser.add_argument(
         "--max-fits",
         type=int,
-        default=None,
-        help="Maximum number of fits to try (default: no limit)",
+        default=1,
+        help="Maximum number of fits to try (default: 1, set to None for no limit)",
     )
     args = parser.parse_args()
 
@@ -151,7 +146,7 @@ def main():
     all_results = {}
     for exp_config in experiments:
         # Use command-line max_fits if provided, otherwise use experiment's default
-        max_fits = args.max_fits if args.max_fits is not None else exp_config.get('max_fits')
+        max_fits = args.max_fits if args.max_fits is not None else exp_config.get('max_fits', 1)
         result = run_experiment(exp_config, output_dir, max_fits=max_fits)
         # Use exp1, exp2, exp3, exp4 as keys (extract from name like "exp1_linear")
         key = exp_config["name"].split("_")[0]

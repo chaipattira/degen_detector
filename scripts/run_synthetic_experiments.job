@@ -30,13 +30,11 @@ EXP=${EXPERIMENTS[$SLURM_ARRAY_TASK_ID]}
 OUTPUT_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/outputs/synthetic"
 
 # Print job information
-echo "=================================================="
 echo "Job ID: ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
 echo "Experiment: ${EXP}"
 echo "Node: $(hostname)"
 echo "Start time: $(date)"
 echo "Output directory: ${OUTPUT_DIR}"
-echo "=================================================="
 
 # Run the experiment
 python /home/x-ctirapongpra/scratch/degen_detector/scripts/run_synthetic_experiments.py \
@@ -44,7 +42,5 @@ python /home/x-ctirapongpra/scratch/degen_detector/scripts/run_synthetic_experim
     --output-dir ${OUTPUT_DIR}
 
 # Print completion info
-echo "=================================================="
 echo "Experiment ${EXP} completed"
 echo "End time: $(date)"
-echo "=================================================="
