@@ -841,6 +841,33 @@ def plot_manifold(analyzer, samples, param_names):
 # Equation Output
 # =============================================================================
 
+def _make_form_string(fit):
+    """Return equation string with numeric constants replaced by c_1, c_2, ...
+
+    Integer values (e.g. exponents like 2 in x**2) are kept as-is; only
+    floating-point literals are replaced.  The same numeric value always gets
+    the same c_i label.
+    """
+    import re
+
+    # Use the pre-built equation_str so we don't need to re-assemble it.
+    eq_str = fit.equation_str
+
+    seen = {}
+    counter = [1]
+
+    def _replace(m):
+        num = m.group(0)
+        if num not in seen:
+            seen[num] = f"c_{counter[0]}"
+            counter[0] += 1
+        return seen[num]
+
+    # Match decimal numbers like 1.23, 1.23e-4, .23 – but NOT bare integers.
+    form_str = re.sub(r"\d*\.\d+(?:[eE][+-]?\d+)?", _replace, eq_str)
+    return form_str
+
+
 def format_all_equations(coupling_search_result, ground_truth=None):
     """Format all fitted equations as text.
 
@@ -896,6 +923,7 @@ def format_all_equations(coupling_search_result, ground_truth=None):
             f"ranked by functional form consensus then R\u00b2_ortho; "
             f"top form: {consensus_count}/{len(cf.fits)} agree, {n_forms} distinct form(s)):"
         )
+        lines.append(f"    Top form: {_make_form_string(cf.fits[0])}")
         for k, fit in enumerate(cf.fits):
             lines.append(f"\n    [{k+1}] {fit.equation_str}")
             lines.append(f"        R\u00b2_ortho:    {fit.orthogonal_r2:.4f}")

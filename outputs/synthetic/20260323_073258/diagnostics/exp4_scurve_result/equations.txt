@@ -13,6 +13,7 @@ Fitted equations (ranked by MI score):
 [1] Parameters: (x, y, z)
     MI score: 0.9525
     Candidates (5 total, ranked by functional form consensus then R²_ortho; top form: 4/5 agree, 2 distinct form(s)):
+    Top form: (c_1*x - c_2)*((c_1*x - c_2)**2 - c_3) + c_4*y + c_5 + c_6*z - c_7 = c_8
 
     [1] (0.860952058774921*x - 0.00976911470650984)*((0.860952058774921*x - 0.00976911470650984)**2 - 2.2780402) + 0.669300545528797*y + 0.0181438528600478 + 0.674018380330065*z - 0.00453011919375806 = 0.0068
         R²_ortho:    0.9931
