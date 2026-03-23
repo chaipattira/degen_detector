@@ -6,7 +6,7 @@
 Four consolidated experiments test different degeneracy types:
 - exp1: Banana-shaped degeneracy (Figure 11 from paper: theta2 ≈ 2*theta1^2 - 0.5)
 - exp2: Cubic degeneracy with informative prior (Figure 12: theta1 ≈ (10*theta2)^3)
-- exp3: Trigonometric (sin, cos functions: sin(x) + cos(y) - z)
+- exp3: Trigonometric (sin, cos functions: 2*sin(x) + cos(y) - z)
 - exp4: S-curve (cubic degeneracy on non-uniform manifold: x^3 - 3x + y + z = 0)
 
 Usage:
@@ -70,9 +70,7 @@ EXPERIMENTS = [
 
 def run_experiment(exp_config, output_dir, max_fits=None):
     """Run a single experiment and return results."""
-    print(f"\n{'='*60}")
     print(f"Running: {exp_config['name']}")
-    print(f"{'='*60}")
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Generate data
@@ -83,7 +81,6 @@ def run_experiment(exp_config, output_dir, max_fits=None):
     print(f"Sample shape: {samples.shape}")
 
     # Run detector
-    print(f"\nInitializing DegenDetector...")
     det = DegenDetector(samples, param_names)
 
     print(f"Running search_couplings with:")
@@ -185,9 +182,7 @@ def main():
     print("="*80)
 
     # Run diagnostics to generate plots
-    print("\n" + "="*80)
     print("Running diagnostics...")
-    print("="*80)
     try:
         runner = DiagnosticsRunner(combined_file)
         runner.run(output_dir=output_dir / "diagnostics")

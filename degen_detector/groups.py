@@ -18,8 +18,8 @@ class RankedTuple:
     pairwise_mi: dict  # {(i, j): mi_value} for inspection
 
 
-def compute_tuple_mi_score(indices, mi_matrix, method="min"):
-    """Compute MI score for a parameter tuple.
+def compute_tuple_mi_score(indices, mi_matrix):
+    """Compute MI score for a parameter tuple as the sum of all pairwise MI.
 
     Parameters
     ----------
@@ -27,17 +27,11 @@ def compute_tuple_mi_score(indices, mi_matrix, method="min"):
         Parameter indices in the tuple.
     mi_matrix : ndarray
         Mutual information matrix.
-    method : str
-        Aggregation method:
-        - "min": minimum pairwise MI (conservative; all pairs must be coupled)
-        - "avg": average pairwise MI
-        - "sum": sum of all pairwise MI
-        - "geometric": geometric mean of pairwise MI
 
     Returns
     -------
     score : float
-        Aggregated MI score.
+        Sum of pairwise MI values.
     pairwise_mi : dict
         Individual pairwise MI values.
     """
@@ -48,23 +42,11 @@ def compute_tuple_mi_score(indices, mi_matrix, method="min"):
     if not values:
         return 0.0, pairwise_mi
 
-    if method == "min":
-        score = min(values)
-    elif method == "avg":
-        score = float(np.mean(values))
-    elif method == "sum":
-        score = sum(values)
-    elif method == "geometric":
-        # Geometric mean; add epsilon to avoid log(0)
-        score = float(np.exp(np.mean(np.log(np.array(values) + 1e-10))))
-    else:
-        raise ValueError(f"Unknown MI ranking method: {method}")
-
+    score = sum(values)
     return score, pairwise_mi
 
 
-def generate_ranked_tuples(mi_result, param_indices, coupling_depth,
-                           mi_rank_method="sum"):
+def generate_ranked_tuples(mi_result, param_indices, coupling_depth):
     """Generate all k-tuples and rank by MI score descending.
 
     Parameters
@@ -75,8 +57,6 @@ def generate_ranked_tuples(mi_result, param_indices, coupling_depth,
         Which parameter indices to consider.
     coupling_depth : int
         Size of tuples (k). Must be >= 2.
-    mi_rank_method : str
-        Method to aggregate pairwise MI into tuple score.
 
     Returns
     -------
@@ -95,7 +75,7 @@ def generate_ranked_tuples(mi_result, param_indices, coupling_depth,
     for indices in combinations(param_indices, coupling_depth):
         indices_list = list(indices)
         score, pairwise = compute_tuple_mi_score(
-            indices_list, mi_result.mi_matrix, mi_rank_method
+            indices_list, mi_result.mi_matrix
         )
         tuples.append(RankedTuple(
             param_indices=indices_list,

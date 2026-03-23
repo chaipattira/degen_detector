@@ -79,7 +79,6 @@ class DegenDetector:
         params: Optional[Union[list, int]] = None,
         coupling_depth: int = 2,
         max_fits: Optional[int] = None,
-        mi_rank_method: str = "sum",
         max_complexity: int = 15,
         niterations: int = 40,
         max_iterations: int = 5,
@@ -107,9 +106,6 @@ class DegenDetector:
             Maximum number of tuples to fit. Tuples are processed in MI-ranked
             order, so this fits the top N most promising combinations.
             None means fit all.
-        mi_rank_method : str
-            How to aggregate pairwise MI into tuple score:
-            "min", "avg", "sum", or "geometric".
         max_complexity : int
             Maximum equation complexity for PySR.
         niterations : int
@@ -145,7 +141,7 @@ class DegenDetector:
             print(f"Selected {len(selected_names)} parameters: {selected_names}")
 
         ranked_tuples = generate_ranked_tuples(
-            mi_result, selected_indices, coupling_depth, mi_rank_method
+            mi_result, selected_indices, coupling_depth
         )
         n_total = len(ranked_tuples)
 
@@ -154,7 +150,7 @@ class DegenDetector:
         n_to_fit = len(tuples_to_fit)
 
         if verbose:
-            print(f"Generated {n_total} {coupling_depth}-tuples, ranked by {mi_rank_method} MI")
+            print(f"Generated {n_total} {coupling_depth}-tuples, ranked by sum MI")
             if max_fits and max_fits < n_total:
                 print(f"Fitting top {n_to_fit} tuples by MI")
 
