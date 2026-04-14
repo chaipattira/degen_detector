@@ -202,25 +202,38 @@ class ImplicitFit:
         return fn(x_j)
 
 
-def _make_pysr_model_1d(max_complexity: int, niterations: int) -> PySRRegressor:
+def _make_pysr_model_1d(
+    max_complexity: int, niterations: int, batch_size: int = 50, log_mode: bool = False
+) -> PySRRegressor:
     """Create a PySR model configured for 1D symbolic regression.
 
     Focuses on polynomial expressions (x, x^2, x^3) which are most common in
-    cosmological degeneracies. Exponential operator heavily penalized.
+    cosmological degeneracies. By default exp is included but heavily penalized
+    (complexity cap 6). In log_mode, exp is excluded entirely because the data
+    is already in log space — power-law degeneracies are polynomial there, and
+    exp would just recover the original variable (exp(log(x)) = x).
     """
+    if log_mode:
+        unary_operators = ["square", "cube"]
+        constraints = {"square": 2, "cube": 2}
+    else:
+        unary_operators = ["square", "exp", "cube"]
+        constraints = {"exp": 6, "square": 2, "cube": 2}
+
     return PySRRegressor(
         binary_operators=["+", "-", "*"],
-        unary_operators=["square", "exp", "cube"],
+        unary_operators=unary_operators,
         maxsize=max_complexity,
         niterations=niterations,
         parsimony=0.01,  # Favor simpler expressions
-        constraints={"exp": 6, "square": 2, "cube": 2},
+        constraints=constraints,
         deterministic=True,
         parallelism='serial',
         random_state=42,
         progress=False,
         verbosity=0,
-        batching=True,  # Enable batching for large datasets
+        batching=True,
+        batch_size=batch_size,
     )
 
 
@@ -233,6 +246,8 @@ def fit_separable_implicit(
     convergence_threshold: float = 0.01,
     verbose: bool = True,
     n_candidates: int = 5,
+    batch_size: int = 50,
+    log_mode: bool = False,
 ) -> list:
     """Fit an implicit surface of separable form.
 
@@ -261,11 +276,21 @@ def fit_separable_implicit(
         Print progress information.
     n_candidates : int, default=5
         Number of candidate equations to return, ranked by orthogonal_r2.
+    batch_size : int, default=50
+        PySR batch size (number of data points per gradient step). Increase
+        for large datasets (e.g. 500–2000 for n > 10k) to reduce noise in
+        fitness evaluation while keeping iteration speed acceptable.
+    log_mode : bool, default=False
+        If True, exclude exp from PySR unary operators. Use when samples are
+        already in log space (e.g. from DegenLogMode), where power-law
+        degeneracies are polynomial and exp is redundant.
 
     Returns
     -------
     fits : list of ImplicitFit
-        Top n_candidates fitted implicit surfaces, ranked by orthogonal_r2.
+        Top n_candidates fitted implicit surfaces. Ranked by functional-form
+        consensus first (most common form across candidates promoted to front),
+        then by orthogonal_r2 descending within each form group.
     """
     k = len(param_names)
     n_samples = samples.shape[0]
@@ -331,7 +356,7 @@ def fit_separable_implicit(
                         component_values[i] = component_values[i] / target_std
 
             # Run 1D symbolic regression
-            model = _make_pysr_model_1d(max_complexity, niterations)
+            model = _make_pysr_model_1d(max_complexity, niterations, batch_size, log_mode)
             x_j = X_norm[:, j].reshape(-1, 1)
             model.fit(x_j, target_j, variable_names=[f"z{j}"])
 

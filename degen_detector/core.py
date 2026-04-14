@@ -84,6 +84,8 @@ class DegenDetector:
         max_iterations: int = 5,
         convergence_threshold: float = 0.01,
         n_candidates: int = 5,
+        batch_size: int = 50,
+        log_mode: bool = False,
         verbose: bool = True,
     ) -> CouplingSearchResult:
         """Search for implicit separable degeneracies.
@@ -116,6 +118,12 @@ class DegenDetector:
             Convergence threshold for alternating optimization.
         n_candidates : int
             Number of candidate equations to save per tuple (from PySR hall of fame).
+        batch_size : int
+            PySR batch size. Increase for large datasets (e.g. 500–2000 for
+            n > 10k) to reduce fitness evaluation noise.
+        log_mode : bool
+            If True, exclude exp from PySR unary operators. Set automatically
+            by DegenLogMode; manual use when samples are already in log space.
         verbose : bool
             Print progress information.
 
@@ -171,6 +179,8 @@ class DegenDetector:
                     max_iterations=max_iterations,
                     convergence_threshold=convergence_threshold,
                     n_candidates=n_candidates,
+                    batch_size=batch_size,
+                    log_mode=log_mode,
                     verbose=True,
                 )
             except Exception as e:

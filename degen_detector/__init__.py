@@ -6,6 +6,8 @@ from degen_detector.groups import RankedTuple, generate_ranked_tuples
 from degen_detector.implicit_fit import ImplicitFit, fit_separable_implicit
 from degen_detector.loss import compute_orthogonal_loss, compute_orthogonal_r2
 
+from degen_detector.transforms import DegenLogMode, LOG_TRANSFORM, ParameterTransform
+
 from degen_detector.synthetic import (
     generate_banana_degeneracy,
     generate_cubic_degeneracy,

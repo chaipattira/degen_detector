@@ -84,16 +84,16 @@ class DiagnosticsRunner:
 
         raise ValueError(f"Unknown pkl format: {type(data)}")
 
-    def run(self, output_dir=None, best_only=False):
+    def run(self, output_dir=None):
         """Run diagnostics and generate plots.
+
+        Generates one subdirectory per valid coupling fit (ranked by MI).
+        Each subdirectory contains component, residual, and manifold plots.
 
         Parameters
         ----------
         output_dir : Path or str, optional
             Directory to save plots. Defaults to pkl_path parent / 'diagnostics'.
-        best_only : bool
-            If True, only generate plots for the best fit (highest R²_ortho).
-            If False, generates plots for top fit by MI ranking.
         """
         import matplotlib.pyplot as plt
 
@@ -142,14 +142,10 @@ class DiagnosticsRunner:
 
         print(f"\nProcessing: {name}")
 
-        # Get best fit (first valid fit by MI ranking)
-        best_cf = next((cf for cf in result.fits if cf.fit is not None), None)
-        if best_cf is None:
+        valid_fits = [cf for cf in result.fits if cf.fit is not None]
+        if not valid_fits:
             print(f"  Warning: No valid fit for {name}, skipping plots")
             return
-
-        best_fit = best_cf.fit
-        analyzer = FitAnalyzer(best_fit)
 
         # 1. Save all equations
         print("  - Equations (all fits)")
@@ -165,47 +161,52 @@ class DiagnosticsRunner:
             print("  - No samples available, skipping plots")
             return
 
-        # 3. Corner plot
+        # 3. Corner plot (once, over all samples)
         print("  - Corner plot")
         fig = plot_corner(samples, param_names)
         fig.savefig(output_dir / "corner.png", dpi=150, bbox_inches='tight')
         plt.close(fig)
 
-        # 4. Component functions
-        print("  - Component functions")
-        fig = plot_components(analyzer, samples, param_names)
-        fig.savefig(output_dir / "components.png", dpi=150, bbox_inches='tight')
-        plt.close(fig)
+        # 4-7. Per-fit plots — one subdirectory per coupling tuple
+        for cf in valid_fits:
+            fit = cf.fit
+            analyzer = FitAnalyzer(fit)
+            fit_dir = output_dir / "_".join(cf.param_names)
+            fit_dir.mkdir(parents=True, exist_ok=True)
+            label = str(cf.param_names)
+            print(f"  [{label}]")
 
-        # 5. True vs predicted
-        print("  - True vs predicted")
-        fig = plot_true_vs_predicted(analyzer, samples, param_names)
-        fig.savefig(output_dir / "true_vs_predicted.png", dpi=150, bbox_inches='tight')
-        plt.close(fig)
-
-        # 6. Residuals
-        print("  - Residuals")
-        fig = plot_residuals(analyzer, samples, param_names)
-        fig.savefig(output_dir / "residuals.png", dpi=150, bbox_inches='tight')
-        plt.close(fig)
-
-        # 7. Manifold plot (2D or 3D based on param count)
-        n_fit_params = len(best_fit.param_names)
-        if n_fit_params == 2:
-            print("  - 2D manifold")
-            fig = plot_manifold_2d(analyzer, samples, param_names)
-            fig.savefig(output_dir / "manifold_2d.png", dpi=150, bbox_inches='tight')
-            plt.close(fig)
-        elif n_fit_params == 3:
-            print("  - 3D manifold")
-            fig = plot_manifold_3d(analyzer, samples, param_names)
-            fig.savefig(output_dir / "manifold_3d.png", dpi=150, bbox_inches='tight')
+            print(f"    - Component functions")
+            fig = plot_components(analyzer, samples, param_names)
+            fig.savefig(fit_dir / "components.png", dpi=150, bbox_inches='tight')
             plt.close(fig)
 
-            print("  - 2D projections")
-            fig = plot_projections_3d(analyzer, samples, param_names)
-            fig.savefig(output_dir / "projections_2d.png", dpi=150, bbox_inches='tight')
+            print(f"    - True vs predicted")
+            fig = plot_true_vs_predicted(analyzer, samples, param_names)
+            fig.savefig(fit_dir / "true_vs_predicted.png", dpi=150, bbox_inches='tight')
             plt.close(fig)
+
+            print(f"    - Residuals")
+            fig = plot_residuals(analyzer, samples, param_names)
+            fig.savefig(fit_dir / "residuals.png", dpi=150, bbox_inches='tight')
+            plt.close(fig)
+
+            n_fit_params = len(fit.param_names)
+            if n_fit_params == 2:
+                print(f"    - 2D manifold")
+                fig = plot_manifold_2d(analyzer, samples, param_names)
+                fig.savefig(fit_dir / "manifold_2d.png", dpi=150, bbox_inches='tight')
+                plt.close(fig)
+            elif n_fit_params == 3:
+                print(f"    - 3D manifold")
+                fig = plot_manifold_3d(analyzer, samples, param_names)
+                fig.savefig(fit_dir / "manifold_3d.png", dpi=150, bbox_inches='tight')
+                plt.close(fig)
+
+                print(f"    - 2D projections")
+                fig = plot_projections_3d(analyzer, samples, param_names)
+                fig.savefig(fit_dir / "projections_2d.png", dpi=150, bbox_inches='tight')
+                plt.close(fig)
 
         print(f"  Done: {output_dir}")
 
