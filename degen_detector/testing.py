@@ -112,6 +112,67 @@ def generate_scurve_separable(n=2000, noise=0.2, seed=42):
     return samples, param_names, ground_truth
 
 
+def generate_pixel_mass(grid_size=3, sigma=0.1, M_obs=2.0, n_samples=2000, seed=42):
+    """Pixel mass reconstruction: infer per-pixel masses from total flux only.
+
+    Physical setup: a 2D grid of n = grid_size² pixels. Each pixel mass
+    m_i has prior N(0,1). Only the total mass C = Σm_i is observable,
+    measured with Gaussian noise σ.
+
+    The posterior P({m_i} | M_obs) is an analytically tractable Gaussian
+    (exact equivalent of converged MCMC).  Samples satisfy mass conservation:
+    Σm_i ≈ M_obs.
+
+    Posterior by conjugate Gaussian analysis:
+        Prior:      m ~ N(0, I_n)
+        Likelihood: M_obs ~ N(1ᵀm, σ²)
+        Precision:  Λ = I + 11ᵀ/σ²
+        Covariance: Σ_post = I − α·11ᵀ,   α = 1/(σ²+n)
+        Mean:       μ_post = M_obs/(σ²+n) · ones_n
+
+    Implied degeneracy (separable implicit surface):
+        g₁(m₁) + g₂(m₂) + … + gₙ(mₙ) = M_obs,   where gᵢ(x) = x
+
+    Parameters
+    ----------
+    grid_size : int
+        Side length of the square pixel grid.  n = grid_size² pixels total.
+    sigma : float
+        Noise on total-mass measurement.  Small σ → tight mass conservation.
+    M_obs : float
+        Observed total mass (the data).
+    n_samples : int
+        Number of posterior samples to draw.
+    seed : int
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    samples : ndarray, shape (n_samples, n)
+    param_names : list[str]
+    ground_truth : dict
+    """
+    n = grid_size ** 2
+    ones = np.ones(n)
+
+    alpha = 1.0 / (sigma ** 2 + n)
+    Sigma_post = np.eye(n) - alpha * np.outer(ones, ones)
+    mu_post = (M_obs / (sigma ** 2 + n)) * ones
+
+    rng = np.random.default_rng(seed)
+    samples = rng.multivariate_normal(mu_post, Sigma_post, size=n_samples)
+
+    param_names = [f"m{i + 1}" for i in range(n)]
+    ground_truth = {
+        "equation": f"m1 + m2 + ... + m{n} = {M_obs}",
+        "M_obs": M_obs,
+        "sigma": sigma,
+        "grid_size": grid_size,
+        "degenerate_params": param_names,
+    }
+    return samples, param_names, ground_truth
+
+
 # Canonical benchmark registry: used by run_synthetic_experiments.py
 SYNTHETIC_CASES = [
     {
@@ -141,5 +202,12 @@ SYNTHETIC_CASES = [
         "generator": generate_scurve_separable,
         "coupling_depth": 3,
         "niterations": 200,
+    },
+    {
+        "name": "pixel_mass",
+        "label": "Pixel mass reconstruction (3×3 grid, mass conservation)",
+        "generator": generate_pixel_mass,
+        "coupling_depth": 9,
+        "niterations": 100,
     },
 ]
