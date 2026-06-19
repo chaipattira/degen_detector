@@ -50,6 +50,17 @@ def _transformed_name(orig_name: str, t: ParameterTransform) -> str:
     return t.name_prefix + orig_name
 
 
+def _is_already_log(name: str) -> bool:
+    """Return True if the parameter name suggests it is already log-transformed.
+
+    Matches names starting with ``log`` or ``ln`` (case-insensitive), with an
+    optional separator (underscore, dash, space) or immediately followed by an
+    uppercase/digit. Examples: ``logA``, ``log_A``, ``lnAs``, ``LOG_SIGMA8``.
+    """
+    low = name.lower()
+    return low.startswith("log") or low.startswith("ln")
+
+
 def _back_transform_fit(
     fit: ImplicitFit,
     transform_map: Dict[str, ParameterTransform],
@@ -195,7 +206,16 @@ class DegenLogMode:
         self.param_names = list(param_names)
 
         if transforms is None:
-            self._transform_map = {name: LOG_TRANSFORM for name in param_names}
+            skipped = [n for n in param_names if _is_already_log(n)]
+            if skipped:
+                print(
+                    f"  DegenLogMode: skipping log transform for already-log parameters: {skipped}"
+                )
+            self._transform_map = {
+                name: LOG_TRANSFORM
+                for name in param_names
+                if not _is_already_log(name)
+            }
         else:
             self._transform_map = dict(transforms)
 
@@ -204,13 +224,12 @@ class DegenLogMode:
     def _apply_transforms(self):
         """Apply all transforms to produce the transformed data matrix.
 
-        Raises
-        ------
-        ValueError
-            If any transformed column contains non-finite values (e.g., log of
-            zero or negative). Catches this before it can silently corrupt MI
-            computation or symbolic regression.
+        Samples where any transformed column is non-finite (e.g., log of zero
+        or negative) are silently dropped. A warning is printed if any rows are
+        removed. This is preferable to skipping the transform for an entire
+        parameter when only a handful of boundary samples are problematic.
         """
+        # Apply all transforms up-front so we can identify bad rows in one pass.
         transformed_cols = []
         transformed_names = []
 
@@ -218,19 +237,40 @@ class DegenLogMode:
             col = self.samples[:, j]
             if name in self._transform_map:
                 t = self._transform_map[name]
-                col_t = t.apply(col)
-                if not np.all(np.isfinite(col_t)):
-                    n_bad = np.sum(~np.isfinite(col_t))
-                    raise ValueError(
-                        f"Parameter '{name}': transform produced {n_bad} non-finite "
-                        f"value(s). Check for zeros or negatives before applying "
-                        f"{t.name_prefix[:-1]} transform."
-                    )
-                transformed_cols.append(col_t)
+                transformed_cols.append(t.apply(col))
                 transformed_names.append(_transformed_name(name, t))
             else:
                 transformed_cols.append(col.copy())
                 transformed_names.append(name)
+
+        # Build valid-row mask: keep rows where every column is finite.
+        valid = np.ones(len(self.samples), dtype=bool)
+        for col_t in transformed_cols:
+            valid &= np.isfinite(col_t)
+
+        n_dropped = int(np.sum(~valid))
+        if n_dropped > 0:
+            print(
+                f"  DegenLogMode: dropping {n_dropped}/{len(self.samples)} samples "
+                f"with non-finite values after transform (zeros or negatives)."
+            )
+            if not np.any(valid):
+                # Identify which parameters caused every row to be dropped
+                bad_params = []
+                for j, (col_t, name) in enumerate(zip(transformed_cols, transformed_names)):
+                    if not np.all(np.isfinite(col_t)):
+                        n_bad = int(np.sum(~np.isfinite(col_t)))
+                        bad_params.append(f"{name} ({n_bad} non-finite)")
+                raise ValueError(
+                    f"DegenLogMode: all {len(self.samples)} samples dropped after transform — "
+                    f"no valid rows remain.\n"
+                    f"Parameters with non-finite values after transform: {bad_params}\n"
+                    f"Likely cause: log-transforming parameters with non-positive values. "
+                    f"Pass explicit `transforms={{}}` to skip log for those parameters, "
+                    f"or check that column indices are correct."
+                )
+            self.samples = self.samples[valid]
+            transformed_cols = [col[valid] for col in transformed_cols]
 
         return np.column_stack(transformed_cols), transformed_names
 

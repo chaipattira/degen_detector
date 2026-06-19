@@ -4,11 +4,6 @@
 from dataclasses import dataclass
 from itertools import combinations
 
-import numpy as np
-
-from degen_detector.analysis import MIResult
-
-
 @dataclass
 class RankedTuple:
     """A parameter tuple with its MI-based ranking score."""

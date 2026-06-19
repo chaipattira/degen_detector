@@ -507,7 +507,7 @@ def plot_projections_3d(analyzer, samples, param_names):
         pass
 
     ax.set_title(f'{p1} vs {p2}\n(colored by {p3})', fontsize=11)
-    cbar = plt.colorbar(scatter, ax=ax, label=p3)
+    plt.colorbar(scatter, ax=ax, label=p3)
     ax.legend(loc='best', fontsize=8)
     ax.grid(True, alpha=0.3)
 

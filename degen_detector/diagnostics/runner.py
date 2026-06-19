@@ -95,7 +95,6 @@ class DiagnosticsRunner:
         output_dir : Path or str, optional
             Directory to save plots. Defaults to pkl_path parent / 'diagnostics'.
         """
-        import matplotlib.pyplot as plt
 
         if output_dir is None:
             if self.pkl_path.is_dir():
@@ -176,34 +175,34 @@ class DiagnosticsRunner:
             label = str(cf.param_names)
             print(f"  [{label}]")
 
-            print(f"    - Component functions")
+            print("    - Component functions")
             fig = plot_components(analyzer, samples, param_names)
             fig.savefig(fit_dir / "components.png", dpi=150, bbox_inches='tight')
             plt.close(fig)
 
-            print(f"    - True vs predicted")
+            print("    - True vs predicted")
             fig = plot_true_vs_predicted(analyzer, samples, param_names)
             fig.savefig(fit_dir / "true_vs_predicted.png", dpi=150, bbox_inches='tight')
             plt.close(fig)
 
-            print(f"    - Residuals")
+            print("    - Residuals")
             fig = plot_residuals(analyzer, samples, param_names)
             fig.savefig(fit_dir / "residuals.png", dpi=150, bbox_inches='tight')
             plt.close(fig)
 
             n_fit_params = len(fit.param_names)
             if n_fit_params == 2:
-                print(f"    - 2D manifold")
+                print("    - 2D manifold")
                 fig = plot_manifold_2d(analyzer, samples, param_names)
                 fig.savefig(fit_dir / "manifold_2d.png", dpi=150, bbox_inches='tight')
                 plt.close(fig)
             elif n_fit_params == 3:
-                print(f"    - 3D manifold")
+                print("    - 3D manifold")
                 fig = plot_manifold_3d(analyzer, samples, param_names)
                 fig.savefig(fit_dir / "manifold_3d.png", dpi=150, bbox_inches='tight')
                 plt.close(fig)
 
-                print(f"    - 2D projections")
+                print("    - 2D projections")
                 fig = plot_projections_3d(analyzer, samples, param_names)
                 fig.savefig(fit_dir / "projections_2d.png", dpi=150, bbox_inches='tight')
                 plt.close(fig)

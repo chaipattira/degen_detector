@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "degen_detector"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.20.0",
+    "scipy>=1.7.0",
+    "sympy>=1.9",
+    "pysr>=0.16.0",
+    "matplotlib>=3.3.0",
+    "corner>=2.2.0",
+]
+
+[project.optional-dependencies]
+getdist = ["getdist"]
+emcee = ["emcee", "h5py"]
+
+[project.scripts]
+degen-detect = "degen_detector.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["degen_detector*"]

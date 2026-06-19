@@ -105,8 +105,8 @@ def main():
     parser.add_argument(
         "--max-fits",
         type=int,
-        default=None,
-        help="Maximum number of tuples to fit by MI rank (default: all)",
+        default=2,
+        help="Maximum number of tuples to fit by MI rank (default: 2, set to None for no limit)",
     )
     parser.add_argument(
         "--niterations",

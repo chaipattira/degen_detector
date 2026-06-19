@@ -1,189 +1,110 @@
 #!/usr/bin/env python
-# ABOUTME: Runs the four synthetic degeneracy experiments and saves results as pickle files.
-# ABOUTME: Results include all candidate fits per tuple (via CouplingSearchResult) for analysis.
-"""Run synthetic degeneracy experiments and save results for plotting.
+# ABOUTME: Runs the synthetic benchmark cases and saves results as pickle files.
+# ABOUTME: Uses SYNTHETIC_CASES registry from degen_detector.testing.
+"""Run synthetic degeneracy benchmark experiments and save results for plotting.
 
-Four consolidated experiments test different degeneracy types:
-- exp1: Banana-shaped degeneracy (Figure 11 from paper: theta2 ≈ 2*theta1^2 - 0.5)
-- exp2: Cubic degeneracy with informative prior (Figure 12: theta1 ≈ (10*theta2)^3)
-- exp3: Trigonometric (sin, cos functions: 2*sin(x) + cos(y) - z)
-- exp4: S-curve (cubic degeneracy on non-uniform manifold: x^3 - 3x + y + z = 0)
+Cases (defined in degen_detector.testing.SYNTHETIC_CASES):
+- banana : 2*theta1^2 + theta2^2 - theta3 = 0.5
+- cubic  : theta1 ≈ (10*theta2)^3
+- trig   : 2*sin(x) + cos(y) - z = 1
+- scurve : (x^3 - 3x) + y + z = 0
 
 Usage:
-    python /home/x-ctirapongpra/scratch/degen_detector/scripts/run_synthetic_experiments.py --experiments exp1
-
-Results are saved as pickle files that can be loaded by notebooks for plotting.
+    python scripts/run_synthetic_experiments.py
+    python scripts/run_synthetic_experiments.py --experiments banana cubic
+    python scripts/run_synthetic_experiments.py --max-fits 3
 """
 import argparse
 import sys
 from pathlib import Path
 
-# Set matplotlib backend before any imports that might use it
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for headless environments
+matplotlib.use('Agg')
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from degen_detector.io import save_pickle, create_output_dir
-
 from degen_detector import DegenDetector
 from degen_detector.diagnostics import DiagnosticsRunner
-from degen_detector.synthetic import (
-    generate_banana_degeneracy,
-    generate_cubic_degeneracy,
-    generate_trig_separable,
-    generate_scurve_separable,
-)
+from degen_detector.io import save_pickle, create_output_dir
+from degen_detector.testing import SYNTHETIC_CASES
 
 
-EXPERIMENTS = [
-    {
-        "name": "exp1_banana",
-        "generator": generate_banana_degeneracy,
-        "coupling_depth": 3,
-        "niterations": 200,
-    },
-    {
-        "name": "exp2_cubic",
-        "generator": generate_cubic_degeneracy,
-        "coupling_depth": 2,
-        "niterations": 200,
-    },
-    {
-        "name": "exp3_trig",
-        "generator": generate_trig_separable,
-        "coupling_depth": 3,
-        "niterations": 200,
-    },
-    {
-        "name": "exp4_scurve",
-        "generator": generate_scurve_separable,
-        "coupling_depth": 3,
-        "niterations": 200,
-    },
-]
+def run_experiment(case, max_fits=1):
+    """Run one benchmark case and return a result dict compatible with DiagnosticsRunner."""
+    samples, param_names, ground_truth = case["generator"]()
+    print(f"\n{'='*60}")
+    print(f"{case['label']}  |  {ground_truth['equation']}")
+    print(f"{'='*60}")
 
-
-def run_experiment(exp_config, output_dir, max_fits=1):
-    """Run a single experiment and return results."""
-    print(f"Running: {exp_config['name']}")
-    
-    # Generate data
-    print("Generating synthetic data...")
-    samples, param_names, ground_truth = exp_config["generator"]()
-
-    print(f"Ground truth: {ground_truth['equation']}")
-    print(f"Sample shape: {samples.shape}")
-
-    # Run detector
-    det = DegenDetector(samples, param_names)
-
-    print(f"Running search_couplings with:")
-    print(f"  coupling_depth={exp_config['coupling_depth']}")
-    print(f"  niterations={exp_config['niterations']}")
-    print(f"  max_fits={max_fits}")
-
-    result = det.search_couplings(
-        coupling_depth=exp_config["coupling_depth"],
-        niterations=exp_config["niterations"],
-        max_complexity=25,
+    result = DegenDetector(samples, param_names).search_couplings(
+        coupling_depth=case["coupling_depth"],
+        niterations=case["niterations"],
         max_fits=max_fits,
     )
 
-    print(f"\nSearch completed!")
-    print(f"Fits attempted: {result.n_fits_attempted}/{result.n_tuples_total}")
-
-    # Results are ranked by MI - first valid fit is the top candidate
     top_fit = next((cf for cf in result.fits if cf.fit is not None), None)
     if top_fit:
-        print(f"Top fit (by MI={top_fit.mi_score:.4f}): {top_fit.fit.equation_str}")
-        print(f"R²_ortho = {top_fit.fit.orthogonal_r2:.4f}")
+        print(f"Found: {top_fit.fit.equation_str}  (R²={top_fit.fit.orthogonal_r2:.4f})")
+    else:
+        print("No fit found.")
 
     return {
-        "name": exp_config["name"],
+        "name": case["name"],
         "ground_truth": ground_truth,
         "samples": samples,
         "param_names": param_names,
         "result": result,
-        "top_fit": top_fit,  # First valid fit by MI ranking
+        "top_fit": top_fit,
     }
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run synthetic degeneracy experiments")
+    parser = argparse.ArgumentParser(description="Run synthetic degeneracy benchmark")
     parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("outputs/synthetic"),
+        "--output-dir", type=Path, default=Path("outputs/synthetic"),
         help="Base output directory (default: outputs/synthetic)",
     )
     parser.add_argument(
-        "--experiments",
-        nargs="+",
-        choices=["exp1", "exp2", "exp3", "exp4"],
-        default=None,
-        help="Specific experiments to run (default: all)",
+        "--experiments", nargs="+",
+        choices=[c["name"] for c in SYNTHETIC_CASES],
+        help="Which cases to run (default: all)",
     )
     parser.add_argument(
-        "--max-fits",
-        type=int,
-        default=1,
-        help="Maximum number of fits to try (default: 1, set to None for no limit)",
+        "--max-fits", type=int, default=1,
+        help="Max MI-ranked tuples to fit per experiment (default: 1)",
     )
     args = parser.parse_args()
 
-    # Create timestamped output directory
     output_dir = create_output_dir(args.output_dir)
-
     print(f"Output directory: {output_dir}")
 
-    # Filter experiments if specified
-    experiments = EXPERIMENTS
+    cases = SYNTHETIC_CASES
     if args.experiments:
-        experiments = [e for e in EXPERIMENTS if e["name"].startswith(tuple(args.experiments))]
+        cases = [c for c in SYNTHETIC_CASES if c["name"] in args.experiments]
 
-    # Run experiments
     all_results = {}
-    for exp_config in experiments:
-        # Use command-line max_fits if provided, otherwise use experiment's default
-        max_fits = args.max_fits if args.max_fits is not None else exp_config.get('max_fits', 1)
-        result = run_experiment(exp_config, output_dir, max_fits=max_fits)
-        # Use exp1, exp2, exp3, exp4 as keys (extract from name like "exp1_linear")
-        key = exp_config["name"].split("_")[0]
-        all_results[key] = result
+    for case in cases:
+        result = run_experiment(case, max_fits=args.max_fits)
+        all_results[case["name"]] = result
+        save_pickle(result, output_dir / f"{case['name']}_result.pkl")
+        print(f"Saved: {case['name']}_result.pkl")
 
-        # Save individual result
-        result_file = output_dir / f"{exp_config['name']}_result.pkl"
-        save_pickle(result, result_file)
-        print(f"Saved: {result_file}")
-
-    # Save combined results
     combined_file = output_dir / "all_results.pkl"
     save_pickle(all_results, combined_file)
-    print(f"\nSaved combined results: {combined_file}")
 
-    # Print summary
-    print("\n" + "="*80)
-    print(f"{'Experiment':<25} {'Ground Truth':<40} {'MI':>8} {'R²_ortho':>10}")
-    print("="*80)
-    for key, r in all_results.items():
+    print(f"\n{'='*60}")
+    print(f"{'Case':<12} {'Ground Truth':<40} {'R²':>8}")
+    print(f"{'='*60}")
+    for name, r in all_results.items():
         gt_eq = r['ground_truth']['equation']
-        if r['top_fit']:
-            mi = r['top_fit'].mi_score
-            r2 = r['top_fit'].fit.orthogonal_r2
-            print(f"{r['name']:<25} {gt_eq:<40} {mi:>8.4f} {r2:>10.4f}")
-        else:
-            print(f"{r['name']:<25} {gt_eq:<40} {'N/A':>8} {'N/A':>10}")
-    print("="*80)
+        r2 = r['top_fit'].fit.orthogonal_r2 if r['top_fit'] else float('nan')
+        print(f"{name:<12} {gt_eq:<40} {r2:>8.4f}")
 
-    # Run diagnostics to generate plots
-    print("Running diagnostics...")
     try:
         runner = DiagnosticsRunner(combined_file)
         runner.run(output_dir=output_dir / "diagnostics")
-        print(f"\nDiagnostics complete! Plots saved to: {output_dir / 'diagnostics'}")
     except Exception as e:
-        print(f"\nWarning: Diagnostics failed: {e}")
+        print(f"\nDiagnostics failed: {e}")
         import traceback
         traceback.print_exc()
 

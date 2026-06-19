@@ -76,7 +76,7 @@ def format_all_equations(coupling_search_result, ground_truth=None):
         n_valid += 1
 
         # Count distinct functional forms among candidates for the header note
-        from degen_detector.implicit_fit import _functional_form_key, _rank_by_consensus
+        from degen_detector.implicit_fit import _rank_by_consensus
         _, consensus_count, n_forms = _rank_by_consensus(cf.fits)
 
         lines.append(

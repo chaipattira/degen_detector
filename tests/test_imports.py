@@ -19,11 +19,21 @@ def test_top_level_imports():
         fit_separable_implicit,
         compute_orthogonal_loss,
         compute_orthogonal_r2,
+    )
+
+
+def test_testing_imports():
+    """Synthetic generators and benchmark registry importable from degen_detector.testing."""
+    from degen_detector.testing import (
         generate_banana_degeneracy,
         generate_cubic_degeneracy,
         generate_trig_separable,
         generate_scurve_separable,
+        SYNTHETIC_CASES,
     )
+    assert len(SYNTHETIC_CASES) == 4
+    for case in SYNTHETIC_CASES:
+        assert {"name", "label", "generator", "coupling_depth", "niterations"} <= case.keys()
 
 
 def test_diagnostics_imports():
@@ -53,3 +63,8 @@ def test_diagnostics_private_imports():
 def test_implicit_fit_private_imports():
     """Private helpers used by diagnostics.equations module."""
     from degen_detector.implicit_fit import _functional_form_key, _rank_by_consensus
+
+
+def test_pipeline_and_loader_imports():
+    """New public exports importable from top-level package."""
+    from degen_detector import run_pipeline, load_getdist, load_emcee, load_numpy

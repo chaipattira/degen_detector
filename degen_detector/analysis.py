@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import numpy as np
 from sklearn.feature_selection import mutual_info_regression
 
-
 @dataclass
 class MIResult:
     """Mutual information between all parameter pairs."""

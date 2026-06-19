@@ -10,7 +10,7 @@ import numpy as np
 
 from degen_detector.analysis import MIResult, mutual_info_matrix, select_params_by_mi
 from degen_detector.groups import generate_ranked_tuples
-from degen_detector.implicit_fit import ImplicitFit, fit_separable_implicit
+from degen_detector.implicit_fit import fit_separable_implicit
 
 
 @dataclass

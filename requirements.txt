@@ -8,6 +8,11 @@ matplotlib>=3.3.0
 # For corner plots (optional but used in plotting.py)
 corner>=2.2.0
 
+# Optional chain format loaders
+getdist>=1.7
+emcee>=3.1
+h5py>=3.0
+
 # Testing dependencies
 pytest>=7.0.0
 pytest-cov>=3.0.0

@@ -237,6 +237,227 @@ def _make_pysr_model_1d(
     )
 
 
+def _prepare_data(
+    samples: np.ndarray, param_names: list, verbose: bool = False
+):
+    """Validate shape, normalize to unit variance, and compute fitting order.
+
+    Returns X_norm, X_mean, X_std, param_names_ordered, inverse_order — all
+    arrays are in reordered space (most nonlinear variable first).
+    """
+    k = len(param_names)
+    if samples.shape[1] != k:
+        raise ValueError(
+            f"samples has {samples.shape[1]} columns but {k} param names given"
+        )
+
+    X_mean = np.mean(samples, axis=0)
+    X_std = np.std(samples, axis=0)
+    X_std = np.where(X_std < 1e-12, 1.0, X_std)
+    X_norm = (samples - X_mean) / X_std
+
+    nonlin_scores = _compute_nonlinearity_scores(X_norm)
+    order = np.argsort(nonlin_scores)[::-1]
+    inverse_order = np.argsort(order)
+
+    X_norm = X_norm[:, order]
+    X_mean = X_mean[order]
+    X_std = X_std[order]
+    param_names_ordered = [param_names[i] for i in order]
+
+    if verbose:
+        print(f"Nonlinearity scores: {dict(zip(param_names, nonlin_scores))}")
+        print(f"Fitting order: {param_names_ordered}")
+
+    return X_norm, X_mean, X_std, param_names_ordered, inverse_order
+
+
+def _run_alternating_opt(
+    X_norm: np.ndarray,
+    param_names_ordered: list,
+    max_iterations: int,
+    max_complexity: int,
+    niterations: int,
+    convergence_threshold: float,
+    batch_size: int,
+    log_mode: bool,
+    verbose: bool,
+):
+    """Run alternating optimization, fitting each component gj(xj) in turn.
+
+    Initializes all components as identity (zj), then iterates: for each
+    component j, hold others fixed, compute the target residual, and fit
+    gj via PySR. Anchors j=0 to unit variance to prevent trivial solutions.
+
+    Returns component_exprs, component_models, c (constant).
+    """
+    k = X_norm.shape[1]
+    component_values = [X_norm[:, j].copy() for j in range(k)]
+    component_exprs = [sympy.Symbol(f"z{j}") for j in range(k)]
+    c = float(np.mean(sum(component_values)))
+    component_models = [None] * k
+
+    for iteration in range(max_iterations):
+        if verbose:
+            print(f"Iteration {iteration + 1}/{max_iterations}")
+
+        for j in range(k):
+            partial_sum = sum(component_values[i] for i in range(k) if i != j)
+            target_j = c - partial_sum
+
+            if j == 0:
+                target_std = np.std(target_j)
+                if target_std > 1e-8:
+                    target_j = target_j / target_std
+                    c = c / target_std
+                    for i in range(1, k):
+                        component_values[i] = component_values[i] / target_std
+
+            model = _make_pysr_model_1d(max_complexity, niterations, batch_size, log_mode)
+            model.fit(X_norm[:, j].reshape(-1, 1), target_j, variable_names=[f"z{j}"])
+            component_models[j] = model
+
+            expr_j = model.sympy()
+            component_exprs[j] = expr_j
+            component_values[j] = sympy.lambdify(
+                sympy.Symbol(f"z{j}"), expr_j, modules="numpy"
+            )(X_norm[:, j])
+
+            if verbose:
+                print(f"  Component {j} ({param_names_ordered[j]}): {expr_j}")
+
+        total = sum(component_values)
+        c = float(np.mean(total))
+        residual_std = float(np.std(total - c))
+
+        if verbose:
+            print(f"  Residual std: {residual_std:.6f}")
+
+        if residual_std < convergence_threshold:
+            if verbose:
+                print(f"Converged at iteration {iteration + 1}")
+            break
+
+    return component_exprs, component_models, c
+
+
+def _build_implicit_fit(
+    comp_exprs_norm: list,
+    c_value: float,
+    X_norm: np.ndarray,
+    X_mean: np.ndarray,
+    X_std: np.ndarray,
+    param_names_ordered: list,
+    inverse_order: np.ndarray,
+    original_param_names: list,
+    samples: np.ndarray,
+) -> "ImplicitFit":
+    """Transform normalized component expressions back to original coordinates.
+
+    Handles denormalization (zj → xj via X_mean/X_std), restores the original
+    parameter ordering, builds the equation string, and computes fit metrics.
+    """
+    k = len(param_names_ordered)
+
+    # Denormalize: substitute zj = (xj - mu_j) / sigma_j
+    comp_exprs_reordered = []
+    for j, expr in enumerate(comp_exprs_norm):
+        sym_orig = sympy.Symbol(param_names_ordered[j])
+        sym_norm = sympy.Symbol(f"z{j}")
+        expr_orig = expr.subs(sym_norm, (sym_orig - X_mean[j]) / X_std[j])
+        comp_exprs_reordered.append(sympy.simplify(expr_orig))
+
+    # Restore original parameter order
+    comp_exprs_orig = [comp_exprs_reordered[inverse_order[i]] for i in range(k)]
+
+    # Build equation string
+    terms = [
+        f"({str(e)})" if str(e).startswith("-") else str(e)
+        for e in comp_exprs_orig
+    ]
+    equation_str = " + ".join(terms) + f" = {c_value:.4f}"
+
+    # Residual std in normalized space
+    comp_vals_norm = [
+        sympy.lambdify(sympy.Symbol(f"z{j}"), expr, modules="numpy")(X_norm[:, j])
+        for j, expr in enumerate(comp_exprs_norm)
+    ]
+    res_std = float(np.std(sum(comp_vals_norm) - c_value))
+
+    orthogonal_r2 = compute_orthogonal_r2(
+        comp_exprs_orig, list(original_param_names), samples, c=c_value, normalize=False
+    )
+    complexity = int(sum(sympy.count_ops(e) for e in comp_exprs_orig))
+
+    return ImplicitFit(
+        component_exprs=comp_exprs_orig,
+        constant=c_value,
+        param_names=list(original_param_names),
+        residual_std=res_std,
+        orthogonal_r2=orthogonal_r2,
+        equation_str=equation_str,
+        complexity=complexity,
+    )
+
+
+def _collect_candidates(
+    component_models: list,
+    component_exprs: list,
+    c: float,
+    n_candidates: int,
+    k: int,
+    build_fit,
+    verbose: bool,
+) -> list:
+    """Collect and rank candidate fits from PySR's hall of fame.
+
+    Starts with the converged best fit, then explores top alternative
+    expressions from each component model's hall of fame. Re-ranks the
+    final pool by functional-form consensus before returning.
+    """
+    candidates = [build_fit(component_exprs, c)]
+
+    if verbose:
+        print(f"\nGenerating top {n_candidates} candidate fits from hall of fame...")
+
+    max_alternatives = min(3, n_candidates)
+    for j in range(k):
+        model = component_models[j]
+        if model is None or not hasattr(model, "equations_"):
+            continue
+        eqs = model.equations_
+        if len(eqs) <= 1:
+            continue
+
+        for alt_idx in range(1, min(max_alternatives, len(eqs) - 1) + 1):
+            if alt_idx >= len(eqs):
+                break
+            alt_exprs = component_exprs.copy()
+            try:
+                alt_exprs[j] = eqs.iloc[alt_idx]["sympy_format"]
+                alt_fit = build_fit(alt_exprs, c)
+                candidates.append(alt_fit)
+                if verbose:
+                    print(f"  Component {j} alt {alt_idx}: R²_ortho={alt_fit.orthogonal_r2:.4f}")
+            except Exception as e:
+                if verbose:
+                    print(f"  Component {j} alt {alt_idx}: Failed - {e}")
+
+    candidates.sort(key=lambda f: (-f.orthogonal_r2, _total_ops(f)))
+    top_candidates, consensus_count, n_forms = _rank_by_consensus(candidates[:n_candidates])
+
+    if verbose:
+        print(
+            f"\nReturning top {len(top_candidates)} fits "
+            f"(consensus form: {consensus_count}/{len(top_candidates)} candidates, "
+            f"{n_forms} distinct form(s)):"
+        )
+        for i, fit in enumerate(top_candidates):
+            print(f"  [{i+1}] R²_ortho={fit.orthogonal_r2:.4f}, residual_std={fit.residual_std:.6f}")
+
+    return top_candidates
+
+
 def fit_separable_implicit(
     samples: np.ndarray,
     param_names: list,
@@ -292,222 +513,22 @@ def fit_separable_implicit(
         consensus first (most common form across candidates promoted to front),
         then by orthogonal_r2 descending within each form group.
     """
-    k = len(param_names)
-    n_samples = samples.shape[0]
+    X_norm, X_mean, X_std, param_names_ordered, inverse_order = _prepare_data(
+        samples, param_names, verbose=verbose
+    )
 
-    if samples.shape[1] != k:
-        raise ValueError(
-            f"samples has {samples.shape[1]} columns but "
-            f"{k} param names given"
+    component_exprs, component_models, c = _run_alternating_opt(
+        X_norm, param_names_ordered, max_iterations, max_complexity,
+        niterations, convergence_threshold, batch_size, log_mode, verbose,
+    )
+
+    def build_fit(comp_exprs_norm, c_value):
+        return _build_implicit_fit(
+            comp_exprs_norm, c_value, X_norm, X_mean, X_std,
+            param_names_ordered, inverse_order, param_names, samples,
         )
 
-    # Normalize data to unit variance for balanced fitting
-    X_mean = np.mean(samples, axis=0)
-    X_std = np.std(samples, axis=0)
-    X_std = np.where(X_std < 1e-12, 1.0, X_std)
-    X_norm = (samples - X_mean) / X_std
-
-    # Determine optimal variable ordering based on nonlinearity scores
-    # Most nonlinear variables should be fitted first
-    nonlin_scores = _compute_nonlinearity_scores(X_norm)
-    order = np.argsort(nonlin_scores)[::-1]  # descending: most nonlinear first
-    inverse_order = np.argsort(order)  # to map back to original order
-
-    if verbose:
-        print(f"Nonlinearity scores: {dict(zip(param_names, nonlin_scores))}")
-        print(f"Fitting order: {[param_names[i] for i in order]}")
-
-    # Reorder data and tracking arrays
-    X_norm = X_norm[:, order]
-    X_mean = X_mean[order]
-    X_std = X_std[order]
-    param_names_ordered = [param_names[i] for i in order]
-
-    # Initialize: gj(xj) = xj (identity/linear)
-    # Simpler, more general starting point for alternating optimization
-    component_values = [X_norm[:, j].copy() for j in range(k)]
-    component_exprs = [sympy.Symbol(f"z{j}") for j in range(k)]
-    c = float(np.mean(sum(component_values)))
-
-    residual_std = np.inf
-
-    # Store PySR models for each component to access hall of fame later
-    component_models = [None] * k
-
-    for iteration in range(max_iterations):
-        if verbose:
-            print(f"Iteration {iteration + 1}/{max_iterations}")
-
-        # Fit each component in turn
-        for j in range(k):
-            # Target for gj: what it should produce
-            partial_sum = sum(component_values[i] for i in range(k) if i != j)
-            target_j = c - partial_sum
-
-            # Anchoring: if j == 0, normalize target to unit variance
-            # to prevent trivial solutions
-            if j == 0:
-                target_std = np.std(target_j)
-                if target_std > 1e-8:
-                    target_j = target_j / target_std
-                    c = c / target_std
-                    # Rescale other components
-                    for i in range(1, k):
-                        component_values[i] = component_values[i] / target_std
-
-            # Run 1D symbolic regression
-            model = _make_pysr_model_1d(max_complexity, niterations, batch_size, log_mode)
-            x_j = X_norm[:, j].reshape(-1, 1)
-            model.fit(x_j, target_j, variable_names=[f"z{j}"])
-
-            # Store model for later access to hall of fame
-            component_models[j] = model
-
-            # Get best expression
-            expr_j = model.sympy()
-            component_exprs[j] = expr_j
-
-            # Update component values
-            sym_j = sympy.Symbol(f"z{j}")
-            fn_j = sympy.lambdify(sym_j, expr_j, modules="numpy")
-            component_values[j] = fn_j(X_norm[:, j])
-
-            if verbose:
-                print(f"  Component {j} ({param_names_ordered[j]}): {expr_j}")
-
-        # Update constant
-        total = sum(component_values)
-        c = float(np.mean(total))
-
-        # Check convergence
-        residual = total - c
-        residual_std = float(np.std(residual))
-
-        if verbose:
-            print(f"  Residual std: {residual_std:.6f}")
-
-        if residual_std < convergence_threshold:
-            if verbose:
-                print(f"Converged at iteration {iteration + 1}")
-            break
-
-    # Helper function to create ImplicitFit from component expressions
-    # Note: param_names is the ORIGINAL order, param_names_ordered is the fitting order
-    original_param_names = param_names  # Capture original order before any reassignment
-
-    def create_implicit_fit(comp_exprs_norm, c_value):
-        """Create ImplicitFit from normalized component expressions."""
-        # Transform expressions back to original coordinates (in reordered space)
-        comp_exprs_reordered = []
-        for j, expr in enumerate(comp_exprs_norm):
-            sym_orig = sympy.Symbol(param_names_ordered[j])
-            sym_norm = sympy.Symbol(f"z{j}")
-            # zj = (xj - mu_j) / sigma_j (X_mean/X_std are already reordered)
-            substitution = (sym_orig - X_mean[j]) / X_std[j]
-            expr_orig = expr.subs(sym_norm, substitution)
-            comp_exprs_reordered.append(sympy.simplify(expr_orig))
-
-        # Reorder expressions back to original parameter order
-        # inverse_order[i] gives the reordered position of original index i
-        comp_exprs_orig = [comp_exprs_reordered[inverse_order[i]] for i in range(k)]
-
-        # Build equation string (in original parameter order)
-        terms = []
-        for expr in comp_exprs_orig:
-            term_str = str(expr)
-            if term_str.startswith("-"):
-                terms.append(f"({term_str})")
-            else:
-                terms.append(term_str)
-        equation_str = " + ".join(terms) + f" = {c_value:.4f}"
-
-        # Compute residual_std in normalized space (still in reordered space)
-        comp_vals_norm = []
-        for j, expr in enumerate(comp_exprs_norm):
-            sym_j = sympy.Symbol(f"z{j}")
-            fn_j = sympy.lambdify(sym_j, expr, modules="numpy")
-            comp_vals_norm.append(fn_j(X_norm[:, j]))
-        total_norm = sum(comp_vals_norm)
-        residual_norm = total_norm - c_value
-        res_std = float(np.std(residual_norm))
-
-        # Compute orthogonal R^2 using the implicit surface loss
-        # comp_exprs_orig is in original order, samples is in original order
-        orthogonal_r2 = compute_orthogonal_r2(
-            comp_exprs_orig, original_param_names, samples, c=c_value, normalize=False
-        )
-
-        complexity = int(sum(sympy.count_ops(e) for e in comp_exprs_orig))
-
-        return ImplicitFit(
-            component_exprs=comp_exprs_orig,
-            constant=c_value,
-            param_names=list(original_param_names),
-            residual_std=res_std,
-            orthogonal_r2=orthogonal_r2,
-            equation_str=equation_str,
-            complexity=complexity,
-        )
-
-    # Generate candidate fits by exploring PySR hall of fame
-    candidates = []
-
-    # Always include the best fit (default converged solution)
-    best_fit = create_implicit_fit(component_exprs, c)
-    candidates.append(best_fit)
-
-    if verbose:
-        print(f"\nGenerating top {n_candidates} candidate fits from hall of fame...")
-
-    # For each component, extract alternative equations from hall of fame
-    max_alternatives = min(3, n_candidates)  # Get top 3 alternatives per component
-    for j in range(k):
-        model = component_models[j]
-        if model is None or not hasattr(model, 'equations_'):
-            continue
-
-        # Get equations DataFrame sorted by loss
-        eqs = model.equations_
-        if len(eqs) <= 1:
-            continue  # Only one equation available
-
-        # Take top equations (skip the first one as it's already in best_fit)
-        n_alts = min(max_alternatives, len(eqs) - 1)
-        for alt_idx in range(1, n_alts + 1):
-            if alt_idx >= len(eqs):
-                break
-
-            # Create alternative component expressions by swapping j-th component
-            alt_comp_exprs = component_exprs.copy()
-            try:
-                alt_expr = eqs.iloc[alt_idx]['sympy_format']
-                alt_comp_exprs[j] = alt_expr
-
-                # Create ImplicitFit with alternative expression
-                alt_fit = create_implicit_fit(alt_comp_exprs, c)
-                candidates.append(alt_fit)
-
-                if verbose:
-                    print(f"  Component {j} alt {alt_idx}: R²_ortho={alt_fit.orthogonal_r2:.4f}")
-            except Exception as e:
-                if verbose:
-                    print(f"  Component {j} alt {alt_idx}: Failed - {e}")
-                continue
-
-    # First sort by R²_ortho to get top n_candidates
-    candidates.sort(key=lambda f: (-f.orthogonal_r2, _total_ops(f)))
-    top_candidates = candidates[:n_candidates]
-
-    # Re-rank by functional form consensus: the most common functional form
-    # (ignoring numeric constants) is promoted to the front. Within each
-    # form group, R²_ortho (descending) and complexity (ascending) apply.
-    top_candidates, consensus_count, n_forms = _rank_by_consensus(top_candidates)
-
-    if verbose:
-        print(f"\nReturning top {len(top_candidates)} fits "
-              f"(consensus form: {consensus_count}/{len(top_candidates)} candidates, "
-              f"{n_forms} distinct form(s)):")
-        for i, fit in enumerate(top_candidates):
-            print(f"  [{i+1}] R²_ortho={fit.orthogonal_r2:.4f}, residual_std={fit.residual_std:.6f}")
-
-    return top_candidates
+    return _collect_candidates(
+        component_models, component_exprs, c, n_candidates,
+        X_norm.shape[1], build_fit, verbose,
+    )
