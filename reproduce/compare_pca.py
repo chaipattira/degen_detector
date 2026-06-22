@@ -35,18 +35,24 @@ CASES = [
     ("pixel_mass", generate_pixel_mass,        {}),
 ]
 OUTPUT_ROOT = Path("outputs/reproduce")
-N_TOP = 3  # top-loading params to show for PCA
 
 
-def pca_metrics(samples, param_names):
-    """PCA on Z-scored samples; report metrics for most-constrained direction."""
+def pca_metrics(samples, param_names, n_top):
+    """PCA on Z-scored samples; report metrics for most-constrained direction.
+
+    R²_ortho uses the same null model as DD (L=1 in Z-scored space).
+    For a linear constraint w·x=c with unit-norm w: L = var(w·x) = last eigenvalue,
+    so R²_ortho = 1 - last_eigenvalue.
+    """
     scaled = StandardScaler().fit_transform(samples)
     pca = PCA().fit(scaled)
     last_vec = pca.components_[-1]
-    resid_std = float(np.sqrt(pca.explained_variance_[-1]))
+    last_var = float(pca.explained_variance_[-1])
+    resid_std = float(np.sqrt(last_var))
+    r2_ortho = float(1.0 - last_var)
     order = np.argsort(np.abs(last_vec))[::-1]
-    top_params = [f"{param_names[i]}({last_vec[i]:+.2f})" for i in order[:N_TOP]]
-    return resid_std, top_params
+    top_params = [f"{param_names[i]}({last_vec[i]:+.2f})" for i in order[:n_top]]
+    return resid_std, r2_ortho, top_params
 
 
 def dd_metrics(result):
@@ -66,24 +72,35 @@ def run():
             data = pickle.load(f)
         dd_std, dd_r2, dd_params = dd_metrics(data["result"])
 
-        pca_std, pca_top = pca_metrics(samples, param_names)
-        rows.append((case_name, gt, pca_std, pca_top, dd_std, dd_r2, dd_params))
+        n_top = len(gt["degenerate_params"])
+        pca_std, pca_r2, pca_top = pca_metrics(samples, param_names, n_top)
+        rows.append((case_name, gt, pca_std, pca_r2, pca_top, dd_std, dd_r2, dd_params))
 
-    # ── Comparison table ──────────────────────────────────────────────────
-    W = 110
-    print("\n" + "=" * W)
-    print(f"{'Case':<12} {'PCA resid_std':>14} {'DD resid_std':>13} {'DD R²':>7}  "
-          f"{'PCA top params (loading)':<36}  DD params")
-    print("=" * W)
-    for case_name, gt, pca_std, pca_top, dd_std, dd_r2, dd_params in rows:
-        print(f"{case_name:<12} {pca_std:>14.4f} {dd_std:>13.4f} {dd_r2:>7.4f}  "
-              f"{', '.join(pca_top):<36}  {dd_params}")
-    print("=" * W)
+    # ── Table 1: numeric metrics ──────────────────────────────────────────
+    W1 = 62
+    print("\n" + "=" * W1)
+    print(f"{'Case':<12} {'PCA resid_std':>14} {'PCA R²':>8} {'DD resid_std':>13} {'DD R²':>8}")
+    print("-" * W1)
+    for case_name, gt, pca_std, pca_r2, pca_top, dd_std, dd_r2, dd_params in rows:
+        print(f"{case_name:<12} {pca_std:>14.4f} {pca_r2:>8.4f} {dd_std:>13.4f} {dd_r2:>8.4f}")
+    print("=" * W1)
 
-    print("\nGround truth:")
+    # ── Table 2: parameter identification ────────────────────────────────
+    W2 = 116
+    print("\n" + "=" * W2)
+    print(f"{'Case':<12}        {'Ground truth':<36}        {'PCA detected':<36}        DD detected")
+    print("-" * W2)
+    for case_name, gt, pca_std, pca_r2, pca_top, dd_std, dd_r2, dd_params in rows:
+        gt_params = ", ".join(gt["degenerate_params"])
+        pca_names = ", ".join(p.split("(")[0] for p in pca_top)
+        dd_names  = ", ".join(dd_params)
+        print(f"{case_name:<12}        {gt_params:<36}        {pca_names:<36}        {dd_names}")
+    print("=" * W2)
+
+    # ── Table 3: ground truth equations ──────────────────────────────────
+    print("\nGround truth equations:")
     for case_name, gt, *_ in rows:
-        print(f"  {case_name:<12}: {gt['equation']}")
-        print(f"               degen params: {gt['degenerate_params']}")
+        print(f"  {case_name:<12}  {gt['equation']}")
     print()
 
 
