@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from degen_detector import run_pipeline
+from degen_detector import run_detector
 
 
 def _banana_samples(n=300, seed=42):
@@ -20,7 +20,7 @@ class TestRunPipeline:
     def test_returns_coupling_search_result(self, tmp_path):
         from degen_detector import CouplingSearchResult
         samples, names = _banana_samples()
-        result = run_pipeline(
+        result = run_detector(
             samples, names, tmp_path / "out",
             coupling_depth=2, max_fits=1, niterations=1, batch_size=50,
         )
@@ -29,7 +29,7 @@ class TestRunPipeline:
     def test_creates_output_dir(self, tmp_path):
         samples, names = _banana_samples()
         out = tmp_path / "nested" / "output"
-        run_pipeline(
+        run_detector(
             samples, names, out,
             max_fits=1, niterations=1, batch_size=50,
         )
@@ -39,7 +39,7 @@ class TestRunPipeline:
         from degen_detector.io import load_pickle
         samples, names = _banana_samples()
         out = tmp_path / "out"
-        run_pipeline(samples, names, out, max_fits=1, niterations=1, batch_size=50)
+        run_detector(samples, names, out, max_fits=1, niterations=1, batch_size=50)
         pkl = out / "result.pkl"
         assert pkl.exists()
         data = load_pickle(pkl)
@@ -50,7 +50,7 @@ class TestRunPipeline:
     def test_saves_summary_txt(self, tmp_path):
         samples, names = _banana_samples()
         out = tmp_path / "out"
-        run_pipeline(samples, names, out, max_fits=1, niterations=1, batch_size=50)
+        run_detector(samples, names, out, max_fits=1, niterations=1, batch_size=50)
         summary = out / "summary.txt"
         assert summary.exists()
         text = summary.read_text()
@@ -61,7 +61,7 @@ class TestRunPipeline:
         """output_dir is used directly — no create_output_dir timestamping."""
         samples, names = _banana_samples()
         out = tmp_path / "exact_dir"
-        run_pipeline(samples, names, out, max_fits=1, niterations=1, batch_size=50)
+        run_detector(samples, names, out, max_fits=1, niterations=1, batch_size=50)
         assert (out / "result.pkl").exists()
         # Should NOT have created a timestamped subdir
         subdirs = [p for p in out.iterdir() if p.is_dir() and p.name != "diagnostics"]
@@ -72,7 +72,7 @@ class TestRunPipeline:
         rng = np.random.default_rng(0)
         samples = rng.uniform(0.1, 2.0, (200, 3))
         names = ["a", "b", "c"]
-        run_pipeline(
+        run_detector(
             samples, names, tmp_path / "log_out",
             log_mode=True, max_fits=1, niterations=1, batch_size=50,
         )

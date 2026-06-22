@@ -17,13 +17,13 @@ pixels simultaneously) and recovers the full mass-conservation constraint.
 
 Outputs to outputs/reproduce/pixel_mass/ (result.pkl, summary.txt, diagnostics/).
 """
-from degen_detector import run_pipeline
+from degen_detector import run_detector
 from degen_detector.testing import generate_pixel_mass
 
 samples, param_names, gt = generate_pixel_mass(grid_size=3, sigma=0.1, M_obs=2.0)
 print(f"Ground truth: {gt['equation']}")
 print(f"n_pixels={len(param_names)}, sigma={gt['sigma']}, M_obs={gt['M_obs']}")
-run_pipeline(
+run_detector(
     samples,
     param_names,
     output_dir="outputs/reproduce/pixel_mass",

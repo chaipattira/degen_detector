@@ -2,17 +2,63 @@
 # ABOUTME: Converts ImplicitFit objects to human-readable equation strings and text files.
 
 
+def _simplified_equation_parts(fit):
+    """Return (sym_str, combined_const) for the RHS-zero form.
+
+    Sums all component_exprs symbolically, extracts the numeric constant, and
+    also absorbs fit.constant so the equation reads:
+        sym_str [± |combined_const|] = 0
+    """
+    import sympy
+
+    total = sum(fit.component_exprs, sympy.Integer(0))
+    free_syms = total.free_symbols
+
+    if free_syms:
+        const_part, var_part = total.as_independent(*free_syms, as_Add=True)
+        combined_const = float(const_part) - fit.constant
+    else:
+        var_part = sympy.Integer(0)
+        combined_const = float(total) - fit.constant
+
+    sym_str = str(var_part)
+    return ("" if sym_str == "0" else sym_str), combined_const
+
+
+def _fmt_simplified_eq(sym_str, combined_const, prec=4):
+    """Build 'sym_str [± |combined_const|] = 0.0000'."""
+    if not sym_str:
+        lhs = f"{combined_const:.{prec}f}"
+    elif abs(combined_const) < 1e-12:
+        lhs = sym_str
+    elif combined_const < 0:
+        lhs = f"{sym_str} - {abs(combined_const):.{prec}f}"
+    else:
+        lhs = f"{sym_str} + {combined_const:.{prec}f}"
+    return f"{lhs} = 0.0000"
+
+
 def _make_form_string(fit):
     """Return equation string with numeric constants replaced by c_1, c_2, ...
 
-    Integer values (e.g. exponents like 2 in x**2) are kept as-is; only
-    floating-point literals are replaced.  The same numeric value always gets
-    the same c_i label.
+    Constants are first combined (including fit.constant) so the form reflects
+    the simplified structure with RHS = 0. Integer values (e.g. exponents like
+    2 in x**2) are kept as-is; only floating-point literals are replaced. The
+    same numeric value always gets the same c_i label.
     """
     import re
 
-    # Use the pre-built equation_str so we don't need to re-assemble it.
-    eq_str = fit.equation_str
+    sym_str, combined_const = _simplified_equation_parts(fit)
+
+    # Build the LHS only (regex operates here); RHS is always the literal "= 0.0000"
+    if not sym_str:
+        lhs = f"{combined_const:.10f}"
+    elif abs(combined_const) < 1e-12:
+        lhs = sym_str
+    elif combined_const < 0:
+        lhs = f"{sym_str} - {abs(combined_const):.10f}"
+    else:
+        lhs = f"{sym_str} + {combined_const:.10f}"
 
     seen = {}
     counter = [1]
@@ -24,9 +70,8 @@ def _make_form_string(fit):
             counter[0] += 1
         return seen[num]
 
-    # Match decimal numbers like 1.23, 1.23e-4, .23 – but NOT bare integers.
-    form_str = re.sub(r"\d*\.\d+(?:[eE][+-]?\d+)?", _replace, eq_str)
-    return form_str
+    form_lhs = re.sub(r"\d*\.\d+(?:[eE][+-]?\d+)?", _replace, lhs)
+    return f"{form_lhs} = 0.0000"
 
 
 def format_all_equations(coupling_search_result, ground_truth=None):
@@ -75,24 +120,34 @@ def format_all_equations(coupling_search_result, ground_truth=None):
 
         n_valid += 1
 
-        # Count distinct functional forms among candidates for the header note
-        from degen_detector.implicit_fit import _rank_by_consensus
-        _, consensus_count, n_forms = _rank_by_consensus(cf.fits)
+        from degen_detector.implicit_fit import _functional_form_key
 
-        lines.append(
-            f"    Candidates ({len(cf.fits)} total, "
-            f"ranked by functional form consensus then R\u00b2_ortho; "
-            f"top form: {consensus_count}/{len(cf.fits)} agree, {n_forms} distinct form(s)):"
-        )
-        lines.append(f"    Top form: {_make_form_string(cf.fits[0])}")
-        for k, fit in enumerate(cf.fits):
-            lines.append(f"\n    [{k+1}] {fit.equation_str}")
-            lines.append(f"        R\u00b2_ortho:    {fit.orthogonal_r2:.4f}")
-            lines.append(f"        Residual std: {fit.residual_std:.6f}")
-            lines.append(f"        Complexity:   {fit.complexity}")
-            lines.append("        Components:")
-            for j, (expr, pname) in enumerate(zip(fit.component_exprs, fit.param_names)):
-                lines.append(f"          g{j+1}({pname}) = {expr}")
+        # Group fits by functional form, preserving order (consensus form first, then R\u00b2_ortho)
+        form_groups = {}
+        for fit in cf.fits:
+            fk = tuple(
+                _functional_form_key(expr, pname)
+                for expr, pname in zip(fit.component_exprs, fit.param_names)
+            )
+            if fk not in form_groups:
+                form_groups[fk] = []
+            form_groups[fk].append(fit)
+
+        n_forms = len(form_groups)
+        lines.append(f"    Candidates ({len(cf.fits)} total, {n_forms} distinct form(s)):")
+
+        for form_num, group in enumerate(form_groups.values(), 1):
+            lines.append(f"\n    #{form_num} top form ({len(group)}/{len(cf.fits)} agree):")
+            lines.append(f"      {_make_form_string(group[0])}")
+            for k, fit in enumerate(group, 1):
+                sym_str, combined_const = _simplified_equation_parts(fit)
+                lines.append(f"\n      [{k}] {_fmt_simplified_eq(sym_str, combined_const, prec=4)}")
+                lines.append(f"          R\u00b2_ortho:    {fit.orthogonal_r2:.4f}")
+                lines.append(f"          Residual std: {fit.residual_std:.6f}")
+                lines.append(f"          Complexity:   {fit.complexity}")
+                lines.append("          Components:")
+                for j, (expr, pname) in enumerate(zip(fit.component_exprs, fit.param_names)):
+                    lines.append(f"            g{j+1}({pname}) = {expr}")
 
     lines.append(f"Total: {len(coupling_search_result.fits)} fits attempted, {n_valid} successful")
     lines.append("-" * 80)

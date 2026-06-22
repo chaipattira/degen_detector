@@ -1,6 +1,7 @@
-"""run_pipeline: point at samples, get diagnostics."""
+"""run_detector: point at samples, get diagnostics."""
 
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -11,7 +12,32 @@ from degen_detector.io import save_pickle
 from degen_detector.transforms import DegenLogMode
 
 
-def run_pipeline(
+class _Tee:
+    def __init__(self, *streams):
+        self._streams = streams
+
+    def write(self, data):
+        for s in self._streams:
+            s.write(data)
+
+    def flush(self):
+        for s in self._streams:
+            s.flush()
+
+
+@contextmanager
+def _tee_stdout(path):
+    f = open(path, "w")
+    old = sys.stdout
+    sys.stdout = _Tee(old, f)
+    try:
+        yield
+    finally:
+        sys.stdout = old
+        f.close()
+
+
+def run_detector(
     samples,
     param_names,
     output_dir,
@@ -57,6 +83,30 @@ def run_pipeline(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    with _tee_stdout(output_dir / "summary.txt"):
+        return _run_detector_inner(
+            samples, param_names, output_dir,
+            log_mode=log_mode,
+            coupling_depth=coupling_depth,
+            max_fits=max_fits,
+            niterations=niterations,
+            max_complexity=max_complexity,
+            batch_size=batch_size,
+        )
+
+
+def _run_detector_inner(
+    samples,
+    param_names,
+    output_dir,
+    *,
+    log_mode,
+    coupling_depth,
+    max_fits,
+    niterations,
+    max_complexity,
+    batch_size,
+):
     # 1. Run detection
     if log_mode:
         detector = DegenLogMode(samples, param_names)
@@ -77,8 +127,8 @@ def run_pipeline(
         output_dir / "result.pkl",
     )
 
-    # 3. Write + print summary
-    _write_summary(result, output_dir / "summary.txt")
+    # 3. Print summary (tee captures it to summary.txt)
+    _write_summary(result)
 
     # 4. Run diagnostics (DiagnosticsRunner takes the pkl path, not the result object)
     try:
@@ -90,8 +140,7 @@ def run_pipeline(
     return result
 
 
-def _write_summary(result, path):
-    """Print equation table to stdout and write to path simultaneously."""
+def _write_summary(result):
     header = f"\n{'='*80}"
     col_header = f"{'Params':<30} {'MI':>8} {'R²_ortho':>10}  Equation"
     sep = "=" * 80
@@ -108,6 +157,4 @@ def _write_summary(result, path):
         lines.append(row)
     lines.append(sep)
 
-    output = "\n".join(lines)
-    print(output)
-    Path(path).write_text(output + "\n")
+    print("\n".join(lines))

@@ -5,12 +5,12 @@ Ground truth: 2*sin(x) + cos(y) - z = 1
 
 Outputs to outputs/reproduce/trig/ (result.pkl, summary.txt, diagnostics/).
 """
-from degen_detector import run_pipeline
+from degen_detector import run_detector
 from degen_detector.testing import generate_trig_separable
 
 samples, param_names, gt = generate_trig_separable()
 print(f"Ground truth: {gt['equation']}")
-run_pipeline(
+run_detector(
     samples,
     param_names,
     output_dir="outputs/reproduce/trig",

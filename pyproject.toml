@@ -18,6 +18,9 @@ dependencies = [
 [project.optional-dependencies]
 getdist = ["getdist"]
 emcee = ["emcee", "h5py"]
+arviz = ["arviz"]
+csv = ["pandas"]
+all = ["getdist", "emcee", "h5py", "arviz", "pandas"]
 
 [project.scripts]
 degen-detect = "degen_detector.cli:main"

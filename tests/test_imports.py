@@ -67,4 +67,4 @@ def test_implicit_fit_private_imports():
 
 def test_pipeline_and_loader_imports():
     """New public exports importable from top-level package."""
-    from degen_detector import run_pipeline, load_getdist, load_emcee, load_numpy
+    from degen_detector import run_detector, load_getdist, load_emcee, load_numpy

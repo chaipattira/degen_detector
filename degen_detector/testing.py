@@ -112,7 +112,7 @@ def generate_scurve_separable(n=2000, noise=0.2, seed=42):
     return samples, param_names, ground_truth
 
 
-def generate_pixel_mass(grid_size=3, sigma=0.1, M_obs=2.0, n_samples=2000, seed=42):
+def generate_pixel_mass(grid_size=3, sigma=0.1, M_obs=2.0, n_samples=2000, n_nuisance=4, seed=42):
     """Pixel mass reconstruction: infer per-pixel masses from total flux only.
 
     Physical setup: a 2D grid of n = grid_size² pixels. Each pixel mass
@@ -143,12 +143,14 @@ def generate_pixel_mass(grid_size=3, sigma=0.1, M_obs=2.0, n_samples=2000, seed=
         Observed total mass (the data).
     n_samples : int
         Number of posterior samples to draw.
+    n_nuisance : int
+        Number of independent N(0,1) nuisance parameters to append.
     seed : int
         Random seed for reproducibility.
 
     Returns
     -------
-    samples : ndarray, shape (n_samples, n)
+    samples : ndarray, shape (n_samples, n + n_nuisance)
     param_names : list[str]
     ground_truth : dict
     """
@@ -160,15 +162,20 @@ def generate_pixel_mass(grid_size=3, sigma=0.1, M_obs=2.0, n_samples=2000, seed=
     mu_post = (M_obs / (sigma ** 2 + n)) * ones
 
     rng = np.random.default_rng(seed)
-    samples = rng.multivariate_normal(mu_post, Sigma_post, size=n_samples)
+    mass_samples = rng.multivariate_normal(mu_post, Sigma_post, size=n_samples)
+    nuisance = rng.normal(0, 1, (n_samples, n_nuisance))
+    samples = np.column_stack([mass_samples, nuisance])
 
-    param_names = [f"m{i + 1}" for i in range(n)]
+    mass_names = [f"m{i + 1}" for i in range(n)]
+    nuisance_names = [f"nu{j + 1}" for j in range(n_nuisance)]
+    param_names = mass_names + nuisance_names
+
     ground_truth = {
         "equation": f"m1 + m2 + ... + m{n} = {M_obs}",
         "M_obs": M_obs,
         "sigma": sigma,
         "grid_size": grid_size,
-        "degenerate_params": param_names,
+        "degenerate_params": mass_names,
     }
     return samples, param_names, ground_truth
 

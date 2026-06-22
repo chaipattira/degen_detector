@@ -7,6 +7,8 @@ Formats:
     getdist   getdist/CosmoMC chain stem (requires --params)
     emcee     emcee HDFBackend HDF5 file
     numpy     .npy or .npz file (requires --param-names)
+    arviz     ArviZ InferenceData NetCDF file (.nc)
+    csv       CSV file with header row
 
 Examples:
     degen-detect data/planck/base_plik --format getdist \\
@@ -17,6 +19,12 @@ Examples:
 
     degen-detect samples.npy --format numpy \\
         --param-names theta1 theta2 theta3 --output-dir out/synth
+
+    degen-detect trace.nc --format arviz \\
+        --params mu sigma --output-dir out/pymc
+
+    degen-detect posterior.csv --format csv \\
+        --params alpha beta --output-dir out/csv
 """
 
 # Must come before any matplotlib import — ensures Agg backend on headless HPC nodes
@@ -26,8 +34,8 @@ matplotlib.use("Agg")
 import argparse
 from pathlib import Path
 
-from degen_detector.loaders import load_getdist, load_emcee, load_numpy
-from degen_detector.pipeline import run_pipeline
+from degen_detector.loaders import load_numpy, load_arviz, load_csv, load_emcee, load_getdist, detect_format
+from degen_detector.pipeline import run_detector
 
 
 def build_parser():
@@ -39,8 +47,8 @@ def build_parser():
     )
     parser.add_argument("source", type=Path, help="Chain root, HDF5 file, or .npy/.npz file")
     parser.add_argument(
-        "--format", required=True, choices=["getdist", "emcee", "numpy"],
-        help="Input format",
+        "--format", default=None, choices=["getdist", "emcee", "numpy", "arviz", "csv"],
+        help="Input format (auto-detected from file extension if omitted)",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"),
                         help="Output directory (default: ./outputs)")
@@ -72,25 +80,39 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    # Conditional required argument enforcement
-    if args.format == "getdist" and not args.params:
-        parser.error("--params is required when --format getdist")
-    if args.format == "numpy" and not args.param_names:
-        parser.error("--param-names is required when --format numpy")
+    # Resolve format (auto-detect or explicit)
+    fmt = args.format
+    if fmt is None:
+        try:
+            fmt = detect_format(args.source)
+            print(f"Auto-detected format: {fmt}")
+        except ValueError as e:
+            parser.error(str(e))
+
+    # numpy needs --param-names; getdist needs --params (load_posterior enforces these too,
+    # but we surface them early as proper argparse errors)
+    if fmt == "numpy" and not args.param_names:
+        parser.error("--param-names is required for numpy files")
+    if fmt == "getdist" and not args.params:
+        parser.error("--params is required for getdist chains")
 
     # Load samples
-    if args.format == "getdist":
-        samples, param_names = load_getdist(
-            args.source, args.params, ignore_rows=args.ignore_rows
-        )
-    elif args.format == "emcee":
+    if fmt == "numpy":
+        samples, param_names = load_numpy(args.source, args.param_names)
+    elif fmt == "emcee":
         samples, param_names = load_emcee(
             args.source, params=args.params, burn_in=args.burn_in, thin=args.thin
         )
-    else:  # numpy
-        samples, param_names = load_numpy(args.source, args.param_names)
+    elif fmt == "getdist":
+        samples, param_names = load_getdist(
+            args.source, args.params, ignore_rows=args.ignore_rows
+        )
+    elif fmt == "arviz":
+        samples, param_names = load_arviz(args.source, params=args.params)
+    else:  # csv
+        samples, param_names = load_csv(args.source, params=args.params)
 
-    run_pipeline(
+    run_detector(
         samples,
         param_names,
         args.output_dir,

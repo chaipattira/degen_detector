@@ -28,39 +28,41 @@ For **multiplicative degeneracies** (e.g., power laws), one can activate `--log-
 ## Installation
 
 ```bash
-pip install -e .
-pip install getdist        # for GetDist / CosmoMC chains
-pip install emcee h5py     # for emcee HDF5 chains
+git clone https://github.com/chaipattira/degen_detector.git
+cd degen_detector
+
+pip install -e ".[all]"
 ```
 
-
-## One-shot Python API
+## Detect degeneracies in two steps!
 
 ```python
-from degen_detector import run_pipeline, load_emcee
+from degen_detector import load_posterior, run_detector
 
-# Load samples via load_numpy, load_getdist, or load_emcee
-samples, param_names = load_emcee("chains.h5", burn_in=200, thin=5)
+samples, param_names = load_posterior("base_plik", params=["omegam", "H0"])  # GetDist
 
-# Run — saves result.pkl, summary.txt, and diagnostic plots to output_dir/
-result = run_pipeline(samples, param_names, output_dir="out/", log_mode=True)
-
-### For power-law / multiplicative degeneracies (e.g. Ωm h³ ≈ const), run in log-mode
+_ = run_detector(samples, param_names, output_dir="out/")
 ```
 
-## CLI
+#### Supported file types
+
+| Format | Extensions | `params` required? |
+|--------|--------------|-------------------|
+| ArviZ NetCDF | `.nc`, `.netcdf` | no |
+| CSV | `.csv` | no |
+| NumPy | `.npy`, `.npz` | **yes** |
+| emcee HDF5 | `.h5` / `.hdf5` (content-sniffed) | no |
+| GetDist / CosmoMC | `<stem>.paramnames` or `<stem>_1.txt` | **yes** |
+
+
+### Running via CLI
+
+```bash
+degen-detect data/planck/base_plik --params omegam H0 sigma8 --log-mode --output-dir out/
 
 ```
-degen-detect <source> --format {getdist,emcee,numpy} [options]
-```
 
-| Format | Required flags |
-|--------|---------------|
-| `getdist` | `--params PARAM [PARAM ...]` |
-| `numpy` | `--param-names NAME [NAME ...]` |
-| `emcee` | *(none — reads labels from file)* |
-
-**Common options:**
+#### Common flags
 
 ```
 --output-dir PATH     Where to write outputs (default: ./outputs)
@@ -70,19 +72,12 @@ degen-detect <source> --format {getdist,emcee,numpy} [options]
 --niterations INT     Symbolic regression iterations (default: 200)
 --burn-in INT         Steps to discard, emcee only (default: 0)
 --thin INT            Thinning factor, emcee only (default: 1)
-```
-
-**Examples:**
-
-```bash
-# Planck CMB chain — use log-mode for the Ωm h³ power-law degeneracy
-degen-detect data/planck/base_plik --format getdist \
-    --params omegam H0 sigma8 --log-mode --output-dir out/planck
+--ignore-rows FLOAT   Burn-in fraction for getdist (default: 0.3)
 ```
 
 ---
 
-## Outputs
+### Outputs
 
 Each run writes to `output_dir/`:
 
