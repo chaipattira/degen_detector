@@ -14,9 +14,9 @@ emcee>=3.1
 h5py>=3.0
 
 # Optional SBI/ML dependencies (for CAMELS SB28 example)
-# CPU build sufficient for inference; install GPU build separately for training
-# ltu-ili
-# torch
+# Install in order (ltu-ili not on PyPI):
+#   uv pip install torch sbi lampe zuko --project /home/x-ctirapongpra/scratch/degen_detector
+#   uv pip install /anvil/scratch/x-ctirapongpra/ltu-ili --project /home/x-ctirapongpra/scratch/degen_detector
 
 # Testing dependencies
 pytest>=7.0.0
