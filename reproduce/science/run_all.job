@@ -12,11 +12,11 @@
 
 
 SCRIPTS=(
-    "planck_logmode.py"
-    "des_y3_logmode.py"
+    "planck/run.py"
+    "des_y3/run.py"
 )
 
-REPRODUCE_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/reproduce"
+SCIENCE_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/reproduce/science"
 PROJECT_DIR="/home/x-ctirapongpra/scratch/degen_detector"
 
 module load gcc/14.2.0
@@ -33,7 +33,7 @@ echo "Node: $(hostname)"
 echo "Start time: $(date)"
 
 # Run the script
-uv run --project ${PROJECT_DIR} python ${REPRODUCE_DIR}/${SCRIPT}
+uv run --project ${PROJECT_DIR} python ${SCIENCE_DIR}/${SCRIPT}
 
 # Print completion info
 echo "${SCRIPT} completed"

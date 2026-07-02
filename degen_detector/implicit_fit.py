@@ -25,7 +25,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import sympy
-from pysr import PySRRegressor
 
 from degen_detector.loss import compute_orthogonal_loss, compute_aic, compute_bic
 
@@ -207,7 +206,7 @@ class ImplicitFit:
 
 def _make_pysr_model_1d(
     max_complexity: int, niterations: int, batch_size: int = 50, log_mode: bool = False
-) -> PySRRegressor:
+):
     """Create a PySR model configured for 1D symbolic regression.
 
     Focuses on polynomial expressions (x, x^2, x^3) which are most common in
@@ -216,6 +215,8 @@ def _make_pysr_model_1d(
     is already in log space — power-law degeneracies are polynomial there, and
     exp would just recover the original variable (exp(log(x)) = x).
     """
+    from pysr import PySRRegressor  # lazy: avoid Julia init at import time
+
     if log_mode:
         unary_operators = ["square", "cube"]
         constraints = {"square": 2, "cube": 2}

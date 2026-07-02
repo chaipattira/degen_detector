@@ -3,9 +3,9 @@
 #SBATCH --nodes=1                         # Number of nodes
 #SBATCH --ntasks=1                        # Number of tasks
 #SBATCH --cpus-per-task=4                # CPUs per task
-#SBATCH --gpus-per-task=1               # GPUs per task (GPU partition)
-#SBATCH --time=04:00:00                  # Time limit
-#SBATCH --partition=gpu                  # GPU partition on Anvil
+#SBATCH --mem=128G                        # maps_raw + maps + x_train peak ~24 GB
+#SBATCH --time=2:00:00                  # Time limit
+#SBATCH --partition=shared               # Partition name
 #SBATCH --account=phy240043              # Account name
 #SBATCH --array=0-2                      # 3 tasks: Mcdm, Mgas, Mstar
 #SBATCH --output=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
@@ -17,7 +17,7 @@ FIELDS=(Mcdm Mgas Mstar)
 FIELD=${FIELDS[$SLURM_ARRAY_TASK_ID]}
 
 DATA_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/data/camels_sb28"
-REPRODUCE_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/reproduce"
+CAMELS_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/reproduce/camels"
 PROJECT_DIR="/home/x-ctirapongpra/scratch/degen_detector"
 OUT_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/outputs/reproduce/camels_sb28"
 
@@ -30,11 +30,11 @@ echo "Field:  ${FIELD}"
 echo "Node:   $(hostname)"
 echo "Start:  $(date)"
 
-uv run --project "${PROJECT_DIR}" python "${REPRODUCE_DIR}/train_camels_sbi.py" \
+uv run --project "${PROJECT_DIR}" python "${CAMELS_DIR}/train.py" \
     --field "${FIELD}" \
     --data-dir "${DATA_DIR}" \
     --out-dir "${OUT_DIR}" \
-    --device cuda
+    --device cpu
 
 echo "${FIELD} training complete"
 echo "End: $(date)"

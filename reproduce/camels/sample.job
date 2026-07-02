@@ -1,0 +1,39 @@
+#!/bin/bash
+#SBATCH --job-name=camels-sample            # Job name
+#SBATCH --nodes=1                           # Number of nodes
+#SBATCH --ntasks=1                          # Number of tasks
+#SBATCH --cpus-per-task=4                  # CPUs per task
+#SBATCH --time=00:30:00                    # Time limit
+#SBATCH --partition=shared                 # CPU-only; torch imports fine without GPU
+#SBATCH --account=phy240043               # Account name
+#SBATCH --array=0-2                        # 3 tasks: Mcdm, Mgas, Mstar
+#SBATCH --output=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
+#SBATCH --error=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
+
+# Task ID → field mapping
+# 0: Mcdm  1: Mgas  2: Mstar
+FIELDS=(Mcdm Mgas Mstar)
+FIELD=${FIELDS[$SLURM_ARRAY_TASK_ID]}
+
+DATA_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/data/camels_sb28"
+CAMELS_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/reproduce/camels"
+PROJECT_DIR="/home/x-ctirapongpra/scratch/degen_detector"
+OUT_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/outputs/reproduce/camels_sb28"
+
+module load gcc/14.2.0
+module load julia/1.11.4
+export PYTHON_JULIAPKG_EXE=$(which julia)
+
+echo "Job ID: ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+echo "Field:  ${FIELD}"
+echo "Node:   $(hostname)"
+echo "Start:  $(date)"
+
+uv run --project "${PROJECT_DIR}" python "${CAMELS_DIR}/sample.py" \
+    --field "${FIELD}" \
+    --params-file "${DATA_DIR}/params_SB28_IllustrisTNG.txt" \
+    --out-dir "${OUT_DIR}" \
+    --n-samples 10000
+
+echo "${FIELD} sampling complete"
+echo "End: $(date)"
