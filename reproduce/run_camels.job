@@ -3,22 +3,29 @@
 #SBATCH --nodes=1                        # Number of nodes
 #SBATCH --ntasks=1                       # Number of tasks
 #SBATCH --cpus-per-task=8               # CPUs per task
-#SBATCH --time=04:00:00                 # Time limit
+#SBATCH --time=06:00:00                 # Time limit (longer for depth 5-6)
 #SBATCH --partition=shared              # CPU shared partition
 #SBATCH --account=phy240043             # Account name
-#SBATCH --array=0-5                     # 6 tasks: 3 fields × 2 log_mode values
+#SBATCH --array=0-29                    # 30 tasks: 3 fields × 2 modes × 5 depths (2-6)
 #SBATCH --output=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
 #SBATCH --error=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
 
-# Task ID → (field, mode) mapping:
-# 0: Mcdm/linear   1: Mcdm/log
-# 2: Mgas/linear   3: Mgas/log
-# 4: Mstar/linear  5: Mstar/log
-FIELDS=(Mcdm Mcdm Mgas Mgas Mstar Mstar)
-MODE_FLAGS=("--linear-only" "--log-mode" "--linear-only" "--log-mode" "--linear-only" "--log-mode")
+# Task ID layout (depth cycles fastest):
+#  0- 4: Mcdm/linear/depth  2,3,4,5,6
+#  5- 9: Mcdm/log/depth     2,3,4,5,6
+# 10-14: Mgas/linear/depth  2,3,4,5,6
+# 15-19: Mgas/log/depth     2,3,4,5,6
+# 20-24: Mstar/linear/depth 2,3,4,5,6
+# 25-29: Mstar/log/depth    2,3,4,5,6
 
-FIELD=${FIELDS[$SLURM_ARRAY_TASK_ID]}
-MODE_FLAG=${MODE_FLAGS[$SLURM_ARRAY_TASK_ID]}
+FIELDS=(Mcdm Mgas Mstar)
+FIELD_IDX=$(( SLURM_ARRAY_TASK_ID / 10 ))
+MODE_IDX=$(( (SLURM_ARRAY_TASK_ID % 10) / 5 ))
+DEPTH_IDX=$(( SLURM_ARRAY_TASK_ID % 5 ))
+
+FIELD=${FIELDS[$FIELD_IDX]}
+COUPLING_DEPTH=$(( DEPTH_IDX + 2 ))           # 2,3,4,5,6
+MODE_FLAG=$( [ "$MODE_IDX" -eq 0 ] && echo "--linear-only" || echo "--log-mode" )
 
 DATA_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/data/camels_sb28"
 REPRODUCE_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/reproduce"
@@ -30,7 +37,7 @@ module load julia/1.11.4
 export PYTHON_JULIAPKG_EXE=$(which julia)
 
 echo "Job ID: ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
-echo "Field:  ${FIELD}, mode flag: '${MODE_FLAG}'"
+echo "Field:  ${FIELD}, mode: ${MODE_FLAG}, coupling_depth: ${COUPLING_DEPTH}"
 echo "Node:   $(hostname)"
 echo "Start:  $(date)"
 
@@ -38,11 +45,11 @@ uv run --project "${PROJECT_DIR}" python "${REPRODUCE_DIR}/run_camels_sb28.py" \
     --field "${FIELD}" \
     --params-file "${DATA_DIR}/params_SB28_IllustrisTNG.txt" \
     --out-dir "${OUT_DIR}" \
-    --n-samples 20000 \
-    --coupling-depth 2 \
+    --n-samples 10000 \
+    --coupling-depth "${COUPLING_DEPTH}" \
     --max-fits 5 \
     --niterations 200 \
     ${MODE_FLAG}
 
-echo "${FIELD} (${MODE_FLAG}) detection complete"
+echo "${FIELD} depth=${COUPLING_DEPTH} ${MODE_FLAG} detection complete"
 echo "End: $(date)"

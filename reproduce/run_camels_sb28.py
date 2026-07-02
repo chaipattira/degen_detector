@@ -77,7 +77,7 @@ def main():
         type=Path,
         default=Path("outputs/reproduce/camels_sb28"),
     )
-    parser.add_argument("--n-samples", type=int, default=20000,
+    parser.add_argument("--n-samples", type=int, default=10000,
                         help="Number of posterior samples to draw")
     parser.add_argument("--coupling-depth", type=int, default=2,
                         help="Coupling depth for degen_detector (default 2 → all pairs)")
@@ -151,7 +151,7 @@ def main():
         modes.append(("log", True))
 
     for mode_name, log_mode in modes:
-        out_dir = args.out_dir / args.field / mode_name
+        out_dir = args.out_dir / args.field / mode_name / f"depth_{args.coupling_depth}"
         print(f"\n{'='*60}")
         print(f"Running degen_detector: {mode_name} mode → {out_dir}")
         print(f"{'='*60}")
