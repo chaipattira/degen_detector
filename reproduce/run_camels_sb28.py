@@ -85,6 +85,8 @@ def main():
     parser.add_argument("--niterations", type=int, default=200)
     parser.add_argument("--log-mode", action="store_true",
                         help="Run only log mode (skip linear); default: run both")
+    parser.add_argument("--linear-only", action="store_true",
+                        help="Run only linear mode (skip log); default: run both")
     args = parser.parse_args()
 
     try:
@@ -145,7 +147,8 @@ def main():
     modes = []
     if not args.log_mode:
         modes.append(("linear", False))
-    modes.append(("log", True))
+    if not args.linear_only:
+        modes.append(("log", True))
 
     for mode_name, log_mode in modes:
         out_dir = args.out_dir / args.field / mode_name

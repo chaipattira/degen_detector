@@ -15,10 +15,10 @@
 # 2: Mgas/linear   3: Mgas/log
 # 4: Mstar/linear  5: Mstar/log
 FIELDS=(Mcdm Mcdm Mgas Mgas Mstar Mstar)
-LOG_FLAGS=("" "--log-mode" "" "--log-mode" "" "--log-mode")
+MODE_FLAGS=("--linear-only" "--log-mode" "--linear-only" "--log-mode" "--linear-only" "--log-mode")
 
 FIELD=${FIELDS[$SLURM_ARRAY_TASK_ID]}
-LOG_FLAG=${LOG_FLAGS[$SLURM_ARRAY_TASK_ID]}
+MODE_FLAG=${MODE_FLAGS[$SLURM_ARRAY_TASK_ID]}
 
 DATA_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/data/camels_sb28"
 REPRODUCE_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/reproduce"
@@ -30,7 +30,7 @@ module load julia/1.11.4
 export PYTHON_JULIAPKG_EXE=$(which julia)
 
 echo "Job ID: ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
-echo "Field:  ${FIELD}, log_mode flag: '${LOG_FLAG}'"
+echo "Field:  ${FIELD}, mode flag: '${MODE_FLAG}'"
 echo "Node:   $(hostname)"
 echo "Start:  $(date)"
 
@@ -42,7 +42,7 @@ uv run --project "${PROJECT_DIR}" python "${REPRODUCE_DIR}/run_camels_sb28.py" \
     --coupling-depth 2 \
     --max-fits 5 \
     --niterations 200 \
-    ${LOG_FLAG}
+    ${MODE_FLAG}
 
-echo "${FIELD} (log_mode=${LOG_FLAG:-false}) detection complete"
+echo "${FIELD} (${MODE_FLAG}) detection complete"
 echo "End: $(date)"

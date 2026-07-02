@@ -80,7 +80,7 @@ def rank_couplings(
     coupling_depth: int = 2,
     params: Optional[Union[list, int]] = None,
     verbose: bool = True,
-) -> list:
+) -> RankingResult:
     """Rank parameter tuples by mutual information — fast screening stage.
 
     Computes pairwise MI between all parameters and ranks every coupling_depth-
@@ -108,9 +108,9 @@ def rank_couplings(
 
     Returns
     -------
-    ranked_tuples : list[RankedTuple]
-        All coupling_depth-tuples sorted by aggregated MI score (descending).
-        Inspect .mi_score and .param_names to decide what to fit.
+    RankingResult
+        Contains all coupling_depth-tuples sorted by aggregated MI score
+        (descending), the MI matrix, and metadata. Pass directly to fit_couplings.
     """
     samples = np.asarray(samples)
     if verbose:
