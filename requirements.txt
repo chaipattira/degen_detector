@@ -13,6 +13,11 @@ getdist>=1.7
 emcee>=3.1
 h5py>=3.0
 
+# Optional SBI/ML dependencies (for CAMELS SB28 example)
+# CPU build sufficient for inference; install GPU build separately for training
+# ltu-ili
+# torch
+
 # Testing dependencies
 pytest>=7.0.0
 pytest-cov>=3.0.0

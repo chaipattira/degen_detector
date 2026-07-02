@@ -21,6 +21,20 @@ from typing import List, Tuple
 GRADIENT_FLOOR = 1e-8
 
 
+def compute_aic(L_perp: float, k: int, N: int) -> float:
+    """AIC ≈ N*log(L_perp) + 2k (additive constant dropped, lower is better)."""
+    if not np.isfinite(L_perp) or L_perp <= 0:
+        return np.nan
+    return N * np.log(L_perp) + 2.0 * k
+
+
+def compute_bic(L_perp: float, k: int, N: int) -> float:
+    """BIC ≈ N*log(L_perp) + k*log(N) (additive constant dropped, lower is better)."""
+    if not np.isfinite(L_perp) or L_perp <= 0:
+        return np.nan
+    return N * np.log(L_perp) + k * np.log(N)
+
+
 def z_score_normalize(X: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Z-score normalize data for scale invariance.

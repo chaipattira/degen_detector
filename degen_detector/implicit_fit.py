@@ -27,7 +27,7 @@ import numpy as np
 import sympy
 from pysr import PySRRegressor
 
-from degen_detector.loss import compute_orthogonal_r2
+from degen_detector.loss import compute_orthogonal_loss, compute_aic, compute_bic
 
 
 def _polynomial_r2(x_predictor: np.ndarray, x_response: np.ndarray, max_degree: int) -> float:
@@ -111,7 +111,7 @@ def _rank_by_consensus(candidates):
     Computes a functional form key for each candidate (ignoring numeric
     constants), counts how many candidates share each form, then sorts so
     the most-common form group comes first. Within each group, sorts by
-    orthogonal_r2 (descending), breaking ties by complexity (ascending).
+    BIC (ascending), breaking ties by complexity (ascending).
 
     Returns
     -------
@@ -134,9 +134,10 @@ def _rank_by_consensus(candidates):
     most_common_form, consensus_count = counts.most_common(1)[0]
 
     def sort_key(idx):
+        b = candidates[idx].bic
         return (
             0 if form_keys[idx] == most_common_form else 1,
-            -candidates[idx].orthogonal_r2,
+            b if np.isfinite(b) else 0.0,
             _total_ops(candidates[idx]),
         )
 
@@ -159,6 +160,8 @@ class ImplicitFit:
     orthogonal_r2: float
     equation_str: str
     complexity: int  # total sympy operation count across all component expressions
+    aic: float  # N*log(L_perp) + 2*complexity; lower is better
+    bic: float  # N*log(L_perp) + complexity*log(N); lower is better
 
     def evaluate(self, X: np.ndarray) -> np.ndarray:
         """Compute sum of gj(xj) - c for each point.
@@ -227,8 +230,7 @@ def _make_pysr_model_1d(
         niterations=niterations,
         parsimony=0.01,  # Favor simpler expressions
         constraints=constraints,
-        deterministic=True,
-        parallelism='serial',
+        parallelism='multithreading',
         random_state=42,
         progress=False,
         verbosity=0,
@@ -384,10 +386,14 @@ def _build_implicit_fit(
     ]
     res_std = float(np.std(sum(comp_vals_norm) - c_value))
 
-    orthogonal_r2 = compute_orthogonal_r2(
+    L_perp = compute_orthogonal_loss(
         comp_exprs_orig, list(original_param_names), samples, c=c_value, normalize=False
     )
+    orthogonal_r2 = (1.0 - L_perp) if np.isfinite(L_perp) else np.nan
     complexity = int(sum(sympy.count_ops(e) for e in comp_exprs_orig))
+    N = samples.shape[0]
+    aic = compute_aic(L_perp, complexity, N)
+    bic = compute_bic(L_perp, complexity, N)
 
     return ImplicitFit(
         component_exprs=comp_exprs_orig,
@@ -397,6 +403,8 @@ def _build_implicit_fit(
         orthogonal_r2=orthogonal_r2,
         equation_str=equation_str,
         complexity=complexity,
+        aic=aic,
+        bic=bic,
     )
 
 
@@ -438,12 +446,16 @@ def _collect_candidates(
                 alt_fit = build_fit(alt_exprs, c)
                 candidates.append(alt_fit)
                 if verbose:
-                    print(f"  Component {j} alt {alt_idx}: R²_ortho={alt_fit.orthogonal_r2:.4f}")
+                    print(f"  Component {j} alt {alt_idx}: BIC={alt_fit.bic:.2f}, AIC={alt_fit.aic:.2f}, R²_ortho={alt_fit.orthogonal_r2:.4f}")
             except Exception as e:
                 if verbose:
                     print(f"  Component {j} alt {alt_idx}: Failed - {e}")
 
-    candidates.sort(key=lambda f: (-f.orthogonal_r2, _total_ops(f)))
+    def _bic_sort_key(f):
+        b = f.bic
+        return (0 if np.isfinite(b) else 1, b if np.isfinite(b) else 0.0, _total_ops(f))
+
+    candidates.sort(key=_bic_sort_key)
     top_candidates, consensus_count, n_forms = _rank_by_consensus(candidates[:n_candidates])
 
     if verbose:
@@ -453,7 +465,7 @@ def _collect_candidates(
             f"{n_forms} distinct form(s)):"
         )
         for i, fit in enumerate(top_candidates):
-            print(f"  [{i+1}] R²_ortho={fit.orthogonal_r2:.4f}, residual_std={fit.residual_std:.6f}")
+            print(f"  [{i+1}] BIC={fit.bic:.2f}, AIC={fit.aic:.2f}, R²_ortho={fit.orthogonal_r2:.4f}, residual_std={fit.residual_std:.6f}")
 
     return top_candidates
 

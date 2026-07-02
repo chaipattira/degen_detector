@@ -13,7 +13,7 @@
 #
 #   3. DES Y3 3x2pt LCDM MagLim
 #      Source: DES public data server (NCSA)
-#      Ref: DES Y3 (Abbott et al. 2022, arXiv:2207.10900)
+#      Ref: DES Y3 (Abbott et al. 2022, arXiv:2105.13549)
 #
 # Usage:
 #   bash scripts/download_obs_chains.sh

@@ -304,8 +304,9 @@ def main():
           f"batch_size={args.batch_size}")
 
     detector = DegenLogMode(samples, param_names)
-    result = detector.search_couplings(
-        coupling_depth=args.coupling_depth,
+    ranking = detector.rank_couplings(coupling_depth=args.coupling_depth)
+    result = detector.fit_couplings(
+        ranking,
         niterations=args.niterations,
         max_complexity=args.max_complexity,
         max_fits=args.max_fits,

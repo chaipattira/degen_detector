@@ -12,7 +12,7 @@ to equal weight, and runs DegenLogMode on cosmological parameters.
 Data source:
     https://desdr-server.ncsa.illinois.edu/despublic/y3a2_files/chains/
     File: chain_3x2pt_lcdm_SR_maglim.txt
-    Reference: DES Y3 (Abbott et al. 2022, arXiv:2207.10900)
+    Reference: DES Y3 (Abbott et al. 2022, arXiv:2105.13549)
 
 Chain format (DES Y3 CosmoSIS polychord output, plain ASCII):
     - No header; each row is one sample.
@@ -278,8 +278,9 @@ def main():
     print("  Expected to recover: log(sigma_8) + 0.5*log(Omega_m) = const  (S8 degeneracy)")
 
     detector = DegenLogMode(samples, param_names)
-    result = detector.search_couplings(
-        coupling_depth=args.coupling_depth,
+    ranking = detector.rank_couplings(coupling_depth=args.coupling_depth)
+    result = detector.fit_couplings(
+        ranking,
         niterations=args.niterations,
         max_complexity=args.max_complexity,
         max_fits=args.max_fits,
@@ -307,7 +308,7 @@ def main():
         "samples": samples,
         "param_names": param_names,
         "result": result,
-        "dataset": "DES Y3 3x2pt LCDM MagLim (Abbott et al. 2022, arXiv:2207.10900)",
+        "dataset": "DES Y3 3x2pt LCDM MagLim (Abbott et al. 2022, arXiv:2105.13549)",
     }
     result_file = output_dir / "des_y3_logmode_result.pkl"
     save_pickle(payload, result_file)

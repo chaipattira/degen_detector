@@ -34,14 +34,44 @@ cd degen_detector
 pip install -e ".[all]"
 ```
 
-## Detect degeneracies in two steps!
+## Usage
+
+### One-shot API
+
+Runs MI screening, symbolic fitting, and diagnostics in one call:
 
 ```python
 from degen_detector import load_posterior, run_detector
 
 samples, param_names = load_posterior("base_plik", params=["omegam", "H0"])  # GetDist
 
-_ = run_detector(samples, param_names, output_dir="out/")
+result = run_detector(samples, param_names, output_dir="out/")
+```
+
+### Two-stage pipeline
+
+```python
+from degen_detector import DegenDetector, DegenLogMode
+
+detector = DegenDetector(samples, param_names)
+
+# Stage 1 — fast: compute pairwise MI and rank all parameter tuples
+ranking = detector.rank_couplings(coupling_depth=2)
+print(ranking.tuples[:5])   # inspect top candidates by MI score
+
+# Stage 2 — slow: fit symbolic equations to the top tuples
+result = detector.fit_couplings(ranking, max_fits=3)
+for cf in result.fits:
+    if cf.fit:
+        print(cf.fit.equation_str, "  R²=", cf.fit.orthogonal_r2)
+```
+
+For power-law / multiplicative degeneracies, use `DegenLogMode` — same two-stage API, fits in log-space and reports back in original coordinates:
+
+```python
+detector = DegenLogMode(samples, param_names)
+ranking  = detector.rank_couplings(coupling_depth=2)
+result   = detector.fit_couplings(ranking, max_fits=3)
 ```
 
 #### Supported file types
@@ -53,6 +83,9 @@ _ = run_detector(samples, param_names, output_dir="out/")
 | NumPy | `.npy`, `.npz` | **yes** |
 | emcee HDF5 | `.h5` / `.hdf5` (content-sniffed) | no |
 | GetDist / CosmoMC | `<stem>.paramnames` or `<stem>_1.txt` | **yes** |
+| PolyChord / MultiNest | any — pass arrays directly | **yes** |
+
+For importance-weighted chains (PolyChord, MultiNest, dynesty), use `load_weighted` to resample to equal weights before passing to `run_detector`.
 
 
 ### Running via CLI

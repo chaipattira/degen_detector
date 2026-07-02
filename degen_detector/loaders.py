@@ -308,6 +308,35 @@ def load_arviz(idata_or_path, params=None, group="posterior"):
     return np.column_stack(cols), available
 
 
+def load_weighted(samples, weights, n_samples=None, seed=None):
+    """Resample importance-weighted samples to produce equal-weight output.
+
+    Use this after loading chains from nested samplers (PolyChord, MultiNest,
+    dynesty) which output samples with unequal importance weights.
+
+    Parameters
+    ----------
+    samples : ndarray, shape (n, d)
+    weights : array-like, shape (n,)
+        Importance weights (need not be normalised; negative values are clipped).
+    n_samples : int or None
+        Number of equal-weight samples to draw. Defaults to the effective
+        sample size floor(1 / sum(w²)).
+    seed : int or None
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    ndarray, shape (n_samples, d)
+    """
+    w = np.maximum(np.asarray(weights, dtype=float), 0.0)
+    w /= w.sum()
+    eff_n = int(1.0 / np.sum(w ** 2))
+    n_draw = min(n_samples, eff_n) if n_samples is not None else eff_n
+    idx = np.random.default_rng(seed).choice(len(samples), size=n_draw, replace=True, p=w)
+    return samples[idx]
+
+
 def load_csv(path, params=None):
     """Load samples from a CSV file.
 

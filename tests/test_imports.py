@@ -10,6 +10,9 @@ def test_top_level_imports():
         DegenDetector,
         CouplingFit,
         CouplingSearchResult,
+        RankingResult,
+        rank_couplings,
+        fit_couplings,
         MIResult,
         mutual_info_matrix,
         select_params_by_mi,
@@ -19,6 +22,9 @@ def test_top_level_imports():
         fit_separable_implicit,
         compute_orthogonal_loss,
         compute_orthogonal_r2,
+        compute_aic,
+        compute_bic,
+        load_weighted,
     )
 
 
@@ -31,7 +37,7 @@ def test_testing_imports():
         generate_scurve_separable,
         SYNTHETIC_CASES,
     )
-    assert len(SYNTHETIC_CASES) == 4
+    assert len(SYNTHETIC_CASES) == 5
     for case in SYNTHETIC_CASES:
         assert {"name", "label", "generator", "coupling_depth", "niterations"} <= case.keys()
 

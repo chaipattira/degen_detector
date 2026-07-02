@@ -36,8 +36,10 @@ def run_experiment(case, max_fits=1):
     print(f"{case['label']}  |  {ground_truth['equation']}")
     print(f"{'='*60}")
 
-    result = DegenDetector(samples, param_names).search_couplings(
-        coupling_depth=case["coupling_depth"],
+    detector = DegenDetector(samples, param_names)
+    ranking = detector.rank_couplings(coupling_depth=case["coupling_depth"])
+    result = detector.fit_couplings(
+        ranking,
         niterations=case["niterations"],
         max_fits=max_fits,
     )

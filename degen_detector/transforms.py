@@ -190,7 +190,8 @@ class DegenLogMode:
     ...     ["Omega_m", "h", "sigma8"],
     ...     transforms={"Omega_m": LOG_TRANSFORM, "h": LOG_TRANSFORM},
     ... )
-    >>> result = detector.search_couplings(coupling_depth=2)
+    >>> ranking = detector.rank_couplings(coupling_depth=2)
+    >>> result = detector.fit_couplings(ranking)
     >>> for cf in result.fits:
     ...     if cf.fit:
     ...         print(cf.fit.equation_str)  # e.g. "log(Omega_m) + 2*log(h) = 1.5000"
@@ -284,7 +285,7 @@ class DegenLogMode:
         Parameters
         ----------
         params : list[str] | int | None
-            As accepted by ``DegenDetector.search_couplings()``.
+            As accepted by ``rank_couplings()``.
             - list[str]: each name is mapped to its transformed name if it was
               transformed, or left unchanged otherwise.
             - int or None: returned as-is.
@@ -304,26 +305,41 @@ class DegenLogMode:
                 translated.append(name)
         return translated
 
-    def search_couplings(self, **kwargs) -> CouplingSearchResult:
-        """Search for degeneracies in transformed space, report in original.
+    def rank_couplings(
+        self,
+        params=None,
+        coupling_depth: int = 2,
+        verbose: bool = True,
+    ):
+        """Rank parameter tuples by MI in transformed space — fast screening stage.
 
-        All keyword arguments are forwarded to
-        ``DegenDetector.search_couplings()``. See that method for the full
-        parameter list. The ``params`` kwarg accepts original parameter names
-        (e.g., ``["Omega_m", "h"]``) — they are translated to transformed
-        names automatically.
-
-        Returns
-        -------
-        CouplingSearchResult
-            Results with all ``ImplicitFit`` expressions back-substituted into
-            original parameter coordinates.
+        The ``params`` argument accepts original parameter names (e.g.,
+        ``["Omega_m", "h"]``) — they are translated to transformed names
+        automatically. Returns a RankingResult whose tuples reference the
+        transformed parameter names.
         """
-        if "params" in kwargs:
-            kwargs["params"] = self._translate_params(kwargs["params"])
+        from degen_detector.core import rank_couplings as _rank_couplings
+        translated_params = self._translate_params(params)
+        return _rank_couplings(
+            self._transformed_samples,
+            self._transformed_names,
+            coupling_depth=coupling_depth,
+            params=translated_params,
+            verbose=verbose,
+        )
+
+    def fit_couplings(self, ranked_tuples, **kwargs) -> CouplingSearchResult:
+        """Fit symbolic equations in transformed space, report in original coordinates.
+
+        Takes the output of rank_couplings and runs symbolic fitting. All
+        ImplicitFit expressions are back-substituted into original parameter
+        coordinates before returning.
+
+        Keyword arguments are forwarded to the module-level fit_couplings.
+        """
+        from degen_detector.core import fit_couplings as _fit_couplings
         kwargs.setdefault("log_mode", True)
-        detector = DegenDetector(self._transformed_samples, self._transformed_names)
-        result = detector.search_couplings(**kwargs)
+        result = _fit_couplings(self._transformed_samples, ranked_tuples, **kwargs)
 
         new_fits = [
             _back_transform_coupling_fit(cf, self._transform_map)

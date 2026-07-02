@@ -113,8 +113,9 @@ def _run_detector_inner(
     else:
         detector = DegenDetector(samples, param_names)
 
-    result = detector.search_couplings(
-        coupling_depth=coupling_depth,
+    ranking = detector.rank_couplings(coupling_depth=coupling_depth)
+    result = detector.fit_couplings(
+        ranking,
         niterations=niterations,
         max_complexity=max_complexity,
         max_fits=max_fits,
@@ -142,7 +143,7 @@ def _run_detector_inner(
 
 def _write_summary(result):
     header = f"\n{'='*80}"
-    col_header = f"{'Params':<30} {'MI':>8} {'R²_ortho':>10}  Equation"
+    col_header = f"{'Params':<30} {'MI':>8} {'BIC':>10} {'R²_ortho':>10}  Equation"
     sep = "=" * 80
 
     lines = [header, col_header, sep]
@@ -150,10 +151,10 @@ def _write_summary(result):
         if cf.fit:
             row = (
                 f"{str(cf.param_names):<30} {cf.mi_score:>8.4f} "
-                f"{cf.fit.orthogonal_r2:>10.4f}  {cf.fit.equation_str}"
+                f"{cf.fit.bic:>10.2f} {cf.fit.orthogonal_r2:>10.4f}  {cf.fit.equation_str}"
             )
         else:
-            row = f"{str(cf.param_names):<30} {cf.mi_score:>8.4f} {'N/A':>10}  (fit failed)"
+            row = f"{str(cf.param_names):<30} {cf.mi_score:>8.4f} {'N/A':>10} {'N/A':>10}  (fit failed)"
         lines.append(row)
     lines.append(sep)
 

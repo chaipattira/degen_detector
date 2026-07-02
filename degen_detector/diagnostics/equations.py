@@ -80,7 +80,7 @@ def format_all_equations(coupling_search_result, ground_truth=None):
     Parameters
     ----------
     coupling_search_result : CouplingSearchResult
-        Result from DegenDetector.search_couplings().
+        Result from rank_couplings() + fit_couplings().
     ground_truth : dict, optional
         Ground truth info with 'equation' and 'component_functions' keys.
 
@@ -142,6 +142,8 @@ def format_all_equations(coupling_search_result, ground_truth=None):
             for k, fit in enumerate(group, 1):
                 sym_str, combined_const = _simplified_equation_parts(fit)
                 lines.append(f"\n      [{k}] {_fmt_simplified_eq(sym_str, combined_const, prec=4)}")
+                lines.append(f"          BIC:          {fit.bic:.2f}")
+                lines.append(f"          AIC:          {fit.aic:.2f}")
                 lines.append(f"          R\u00b2_ortho:    {fit.orthogonal_r2:.4f}")
                 lines.append(f"          Residual std: {fit.residual_std:.6f}")
                 lines.append(f"          Complexity:   {fit.complexity}")
@@ -161,7 +163,7 @@ def save_equations(coupling_search_result, output_path, ground_truth=None):
     Parameters
     ----------
     coupling_search_result : CouplingSearchResult
-        Result from DegenDetector.search_couplings().
+        Result from rank_couplings() + fit_couplings().
     output_path : Path or str
         Path to save the text file.
     ground_truth : dict, optional

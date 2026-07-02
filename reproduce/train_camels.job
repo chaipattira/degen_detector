@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --job-name=camels-train           # Job name
+#SBATCH --nodes=1                         # Number of nodes
+#SBATCH --ntasks=1                        # Number of tasks
+#SBATCH --cpus-per-task=4                # CPUs per task
+#SBATCH --gpus-per-task=1               # GPUs per task (GPU partition)
+#SBATCH --time=04:00:00                  # Time limit
+#SBATCH --partition=gpu                  # GPU partition on Anvil
+#SBATCH --account=phy240043              # Account name
+#SBATCH --array=0-2                      # 3 tasks: Mcdm, Mgas, Mstar
+#SBATCH --output=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
+#SBATCH --error=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
+
+# Task ID → field mapping
+# 0: Mcdm  1: Mgas  2: Mstar
+FIELDS=(Mcdm Mgas Mstar)
+FIELD=${FIELDS[$SLURM_ARRAY_TASK_ID]}
+
+DATA_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/data/camels_sb28"
+REPRODUCE_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/reproduce"
+PROJECT_DIR="/home/x-ctirapongpra/scratch/degen_detector"
+OUT_DIR="/anvil/scratch/x-ctirapongpra/degen_detector/outputs/reproduce/camels_sb28"
+
+module load gcc/14.2.0
+module load julia/1.11.4
+export PYTHON_JULIAPKG_EXE=$(which julia)
+
+echo "Job ID: ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+echo "Field:  ${FIELD}"
+echo "Node:   $(hostname)"
+echo "Start:  $(date)"
+
+uv run --project "${PROJECT_DIR}" python "${REPRODUCE_DIR}/train_camels_sbi.py" \
+    --field "${FIELD}" \
+    --data-dir "${DATA_DIR}" \
+    --out-dir "${OUT_DIR}" \
+    --device cuda
+
+echo "${FIELD} training complete"
+echo "End: $(date)"

@@ -20,6 +20,9 @@ getdist = ["getdist"]
 emcee = ["emcee", "h5py"]
 arviz = ["arviz"]
 csv = ["pandas"]
+# sbi: ltu-ili must be installed from git (not on PyPI):
+#   pip install git+https://github.com/maho3/ltu-ili.git
+#   pip install sbi torch
 all = ["getdist", "emcee", "h5py", "arviz", "pandas"]
 
 [project.scripts]
