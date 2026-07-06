@@ -125,6 +125,8 @@ def _back_transform_fit(
         orthogonal_r2=fit.orthogonal_r2,
         equation_str=equation_str,
         complexity=fit.complexity,
+        aic=fit.aic,
+        bic=fit.bic,
     )
 
 

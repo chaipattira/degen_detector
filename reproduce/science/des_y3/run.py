@@ -22,7 +22,7 @@ import numpy as np
 from degen_detector import run_detector, load_weighted
 
 CHAIN_FILE = (
-    Path(__file__).parent.parent
+    Path(__file__).parent.parent.parent.parent
     / "data/des_y3_3x2pt/chain_3x2pt_lcdm_SR_maglim.txt"
 )
 

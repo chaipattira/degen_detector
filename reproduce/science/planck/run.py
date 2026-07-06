@@ -13,7 +13,7 @@ from pathlib import Path
 from degen_detector import load_posterior, run_detector
 
 CHAIN_ROOT = (
-    Path(__file__).parent.parent
+    Path(__file__).parent.parent.parent.parent
     / "data/base/plikHM_TTTEEE_lowl_lowE_lensing"
     / "base_plikHM_TTTEEE_lowl_lowE_lensing"
 )
@@ -28,20 +28,26 @@ COSMO_PARAMS = [
     "ns",        # spectral index
     "H0",        # Hubble constant (derived)
     "omegam",    # Omega_matter (derived)
+    "omegamh2",  # Omega_m h^2 (derived)
     "sigma8",    # sigma_8 (derived)
 ]
 
 
 def main():
-    parser = argparse.ArgumentParser(description="DegenLogMode on Planck 2018 chains")
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs/reproduce/planck_logmode"))
-    parser.add_argument("--coupling-depth", type=int, default=2)
+    parser = argparse.ArgumentParser(description="Degen detector on Planck 2018 chains")
+    parser.add_argument("--log-mode", action="store_true", default=False)
+    parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument("--coupling-depth", type=int, default=3)
     parser.add_argument("--max-fits", type=int, default=3)
     parser.add_argument("--niterations", type=int, default=200)
     parser.add_argument("--max-complexity", type=int, default=15)
     parser.add_argument("--batch-size", type=int, default=1000)
     parser.add_argument("--ignore-rows", type=float, default=0.3)
     args = parser.parse_args()
+
+    if args.output_dir is None:
+        suffix = "logmode" if args.log_mode else "linmode"
+        args.output_dir = Path(f"outputs/reproduce/planck_{suffix}")
 
     samples, param_names = load_posterior(
         CHAIN_ROOT, params=COSMO_PARAMS, ignore_rows=args.ignore_rows
@@ -51,7 +57,7 @@ def main():
         samples,
         param_names,
         output_dir=args.output_dir,
-        log_mode=True,
+        log_mode=args.log_mode,
         coupling_depth=args.coupling_depth,
         niterations=args.niterations,
         max_complexity=args.max_complexity,
