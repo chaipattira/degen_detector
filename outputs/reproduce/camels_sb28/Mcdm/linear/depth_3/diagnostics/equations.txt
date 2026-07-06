@@ -1,0 +1,339 @@
+DEGENERACY DETECTION RESULTS
+
+Fitted equations (ranked by MI score):
+
+[1] Parameters: (Omega_m, n_s, chi_qso)
+    MI score: 0.2070
+    Candidates (5 total, 2 distinct form(s)):
+
+    #1 top form (4/5 agree):
+      c_1*Omega_m - c_2*n_s + c_3*exp(-c_4*chi_qso) - c_5 = 0.0000
+
+      [1] 7.85316859713577*Omega_m - 3.15784575256374*n_s + 0.365097943806875*exp(-112.885*chi_qso) - 0.3713 = 0.0000
+          BIC:          -79475.42
+          AIC:          -79533.10
+          R²_ortho:    0.9996
+          Residual std: 0.293510
+          Complexity:   8
+          Components:
+            g1(Omega_m) = 7.85316859713577*Omega_m - 2.70414555162927
+            g2(n_s) = 2.54875358014133 - 3.15784575256374*n_s
+            g3(chi_qso) = 40.84736 + 0.365097943806875*exp(-112.885*chi_qso)
+
+      [2] 7.85316859713577*Omega_m - 3.1623396040517*n_s + 0.365097943806875*exp(-112.885*chi_qso) - 0.3701 = 0.0000
+          BIC:          -79460.88
+          AIC:          -79518.56
+          R²_ortho:    0.9996
+          Residual std: 0.293510
+          Complexity:   8
+          Components:
+            g1(Omega_m) = 7.85316859713577*Omega_m - 2.70414555162927
+            g2(n_s) = 2.54994477375279 - 3.1623396040517*n_s
+            g3(chi_qso) = 40.84736 + 0.365097943806875*exp(-112.885*chi_qso)
+
+      [3] 7.85316859713577*Omega_m - 3.1623396040517*n_s + 0.365097943806875*exp(-112.885*chi_qso) - 0.3701 = 0.0000
+          BIC:          -79460.88
+          AIC:          -79518.56
+          R²_ortho:    0.9996
+          Residual std: 0.293510
+          Complexity:   8
+          Components:
+            g1(Omega_m) = 7.85316859713577*Omega_m - 2.70414555162927
+            g2(n_s) = 2.54994477375279 - 3.1623396040517*n_s
+            g3(chi_qso) = 40.84736 + 0.365097943806875*exp(-112.885*chi_qso)
+
+      [4] 7.85316859713577*Omega_m - 3.1623396040517*n_s + 0.365097943806875*exp(-112.885*chi_qso) - 0.3701 = 0.0000
+          BIC:          -79460.88
+          AIC:          -79518.56
+          R²_ortho:    0.9996
+          Residual std: 0.293510
+          Complexity:   8
+          Components:
+            g1(Omega_m) = 7.85316859713577*Omega_m - 2.70414555162927
+            g2(n_s) = 2.54994477375279 - 3.1623396040517*n_s
+            g3(chi_qso) = 40.84736 + 0.365097943806875*exp(-112.885*chi_qso)
+
+    #2 top form (1/5 agree):
+      c_1*Omega_m + c_2*exp(-c_3*n_s) + c_4*exp(-c_5*chi_qso) - c_6 = 0.0000
+
+      [1] 7.85316859713577*Omega_m + 14.9151361953924*exp(-3.35137940047741*n_s) + 0.365097943806875*exp(-112.885*chi_qso) - 3.9216 = 0.0000
+          BIC:          -79605.70
+          AIC:          -79677.81
+          R²_ortho:    0.9997
+          Residual std: 0.293388
+          Complexity:   10
+          Components:
+            g1(Omega_m) = 7.85316859713577*Omega_m - 2.70414555162927
+            g2(n_s) = -1.0016277 + 14.9151361953924*exp(-3.35137940047741*n_s)
+            g3(chi_qso) = 40.84736 + 0.365097943806875*exp(-112.885*chi_qso)
+
+[2] Parameters: (Omega_m, sigma_8, n_s)
+    MI score: 0.1723
+    Candidates (5 total, 4 distinct form(s)):
+
+    #1 top form (2/5 agree):
+      c_1*Omega_m - c_2*sigma_8 - c_3*n_s + c_4 = 0.0000
+
+      [1] 4.21133541321884*Omega_m - 2.11720236666386*sigma_8 - 15.4727980097055*n_s + 12.4646 = 0.0000
+          BIC:          -73997.09
+          AIC:          -74040.35
+          R²_ortho:    0.9994
+          Residual std: 0.398854
+          Complexity:   6
+          Components:
+            g1(Omega_m) = 4.21133541321884*Omega_m - 1.45012344803447
+            g2(sigma_8) = 1.43826517196423 - 2.11720236666386*sigma_8
+            g3(n_s) = 12.4764526775146 - 15.4727980097055*n_s
+
+      [2] 4.21133541321884*Omega_m - 2.11720236666386*sigma_8 - 15.4727980097055*n_s + 12.4646 = 0.0000
+          BIC:          -73997.09
+          AIC:          -74040.35
+          R²_ortho:    0.9994
+          Residual std: 0.398854
+          Complexity:   6
+          Components:
+            g1(Omega_m) = 4.21133541321884*Omega_m - 1.45012344803447
+            g2(sigma_8) = 1.43826517196423 - 2.11720236666386*sigma_8
+            g3(n_s) = 12.4764526775146 - 15.4727980097055*n_s
+
+    #2 top form (1/5 agree):
+      -c_1*Omega_m**3 + c_2*Omega_m**2 - c_3*Omega_m - c_4*sigma_8 - c_5*n_s + c_6 = 0.0000
+
+      [1] -291.455905513944*Omega_m**3 + 301.078170624624*Omega_m**2 - 98.0079545347723*Omega_m - 2.11720236666386*sigma_8 - 15.4727980097055*n_s + 23.8636 = 0.0000
+          BIC:          -74181.78
+          AIC:          -74268.31
+          R²_ortho:    0.9994
+          Residual std: 0.396603
+          Complexity:   12
+          Components:
+            g1(Omega_m) = -291.455905513944*Omega_m**3 + 301.078170624624*Omega_m**2 - 98.0079545347723*Omega_m + 9.94890018962686
+            g2(sigma_8) = 1.43826517196423 - 2.11720236666386*sigma_8
+            g3(n_s) = 12.4764526775146 - 15.4727980097055*n_s
+
+    #3 top form (1/5 agree):
+      c_1*Omega_m - c_2*n_s + c_3*exp(-c_4*sigma_8) + c_5 = 0.0000
+
+      [1] 4.21133541321884*Omega_m - 15.4727980097055*n_s + 4.84364978677273*exp(-2.32241147144867*sigma_8) + 10.0200 = 0.0000
+          BIC:          -74042.01
+          AIC:          -74099.69
+          R²_ortho:    0.9994
+          Residual std: 0.398568
+          Complexity:   8
+          Components:
+            g1(Omega_m) = 4.21133541321884*Omega_m - 1.45012344803447
+            g2(sigma_8) = -1.0063425 + 4.84364978677273*exp(-2.32241147144867*sigma_8)
+            g3(n_s) = 12.4764526775146 - 15.4727980097055*n_s
+
+    #4 top form (1/5 agree):
+      c_1*Omega_m - c_2*sigma_8 - c_3*n_s + c_4*(c_5*sigma_8 - c_6)**3 + c_7 = 0.0000
+
+      [1] 4.21133541321884*Omega_m - 2.4428102516774*sigma_8 - 15.4727980097055*n_s + 0.0033430282*(19.1099*sigma_8 - 12.9818)**3 + 12.6858 = 0.0000
+          BIC:          -74009.33
+          AIC:          -74088.64
+          R²_ortho:    0.9994
+          Residual std: 0.398306
+          Complexity:   11
+          Components:
+            g1(Omega_m) = 4.21133541321884*Omega_m - 1.45012344803447
+            g2(sigma_8) = -2.4428102516774*sigma_8 + 0.0033430282*(19.1099*sigma_8 - 12.9818)**3 + 1.65945823697569
+            g3(n_s) = 12.4764526775146 - 15.4727980097055*n_s
+
+[3] Parameters: (Omega_m, n_s, eps_bh)
+    MI score: 0.1598
+    Candidates (5 total, 2 distinct form(s)):
+
+    #1 top form (4/5 agree):
+      -c_1*Omega_m - c_2*eps_bh**2 + c_3*eps_bh + c_4*exp(-c_5*n_s) + c_6 = 0.0000
+
+      [1] -6.59319239507324*Omega_m - 11.9471047085903*eps_bh**2 + 2.8661238354126*eps_bh + 102593543869.642*exp(-34.7359*n_s) + 2.0433 = 0.0000
+          BIC:          -64836.41
+          AIC:          -64908.52
+          R²_ortho:    0.9985
+          Residual std: 0.299658
+          Complexity:   10
+          Components:
+            g1(Omega_m) = 2.27028767632416 - 6.59319239507324*Omega_m
+            g2(n_s) = 102593543869.642*exp(-34.7359*n_s)
+            g3(eps_bh) = -11.9471047085903*eps_bh**2 + 2.8661238354126*eps_bh - 84.4050465802766
+
+      [2] -6.59319239507324*Omega_m - 11.9471047085903*eps_bh**2 + 2.8661238354126*eps_bh + 102593543869.642*exp(-34.7359*n_s) + 2.0433 = 0.0000
+          BIC:          -64836.41
+          AIC:          -64908.52
+          R²_ortho:    0.9985
+          Residual std: 0.299658
+          Complexity:   10
+          Components:
+            g1(Omega_m) = 2.27028767632416 - 6.59319239507324*Omega_m
+            g2(n_s) = 102593543869.642*exp(-34.7359*n_s)
+            g3(eps_bh) = -11.9471047085903*eps_bh**2 + 2.8661238354126*eps_bh - 84.4050465802766
+
+      [3] -6.59319239507324*Omega_m - 11.9471047085903*eps_bh**2 + 2.8661238354126*eps_bh + 102593543869.642*exp(-34.7359*n_s) + 2.0433 = 0.0000
+          BIC:          -64836.41
+          AIC:          -64908.52
+          R²_ortho:    0.9985
+          Residual std: 0.299658
+          Complexity:   10
+          Components:
+            g1(Omega_m) = 2.27028767632416 - 6.59319239507324*Omega_m
+            g2(n_s) = 102593543869.642*exp(-34.7359*n_s)
+            g3(eps_bh) = -11.9471047085903*eps_bh**2 + 2.8661238354126*eps_bh - 84.4050465802766
+
+      [4] -6.59319239507324*Omega_m - 11.9471047085903*eps_bh**2 + 2.8661238354126*eps_bh + 102593543869.642*exp(-34.7359*n_s) + 2.0433 = 0.0000
+          BIC:          -64836.41
+          AIC:          -64908.52
+          R²_ortho:    0.9985
+          Residual std: 0.299658
+          Complexity:   10
+          Components:
+            g1(Omega_m) = 2.27028767632416 - 6.59319239507324*Omega_m
+            g2(n_s) = 102593543869.642*exp(-34.7359*n_s)
+            g3(eps_bh) = -11.9471047085903*eps_bh**2 + 2.8661238354126*eps_bh - 84.4050465802766
+
+    #2 top form (1/5 agree):
+      -c_1*Omega_m + c_2*exp(-c_3*eps_bh**2 + c_4*eps_bh) + c_5*exp(-c_6*n_s) + c_7 = 0.0000
+
+      [1] -6.59319239507324*Omega_m + 0.765698892475912*exp(-18.5546103549426*eps_bh**2 + 4.45127185977173*eps_bh) + 102593543869.642*exp(-34.7359*n_s) + 1.2264 = 0.0000
+          BIC:          -65087.06
+          AIC:          -65173.59
+          R²_ortho:    0.9985
+          Residual std: 0.298202
+          Complexity:   12
+          Components:
+            g1(Omega_m) = 2.27028767632416 - 6.59319239507324*Omega_m
+            g2(n_s) = 102593543869.642*exp(-34.7359*n_s)
+            g3(eps_bh) = 0.765698892475912*exp(-18.5546103549426*eps_bh**2 + 4.45127185977173*eps_bh) - 85.221924
+
+[4] Parameters: (Omega_m, n_s, rho_wind)
+    MI score: 0.1586
+    Candidates (5 total, 2 distinct form(s)):
+
+    #1 top form (4/5 agree):
+      c_1*Omega_m + c_2*rho_wind - c_3*n_s + c_4 = 0.0000
+
+      [1] 10.7842537067181*Omega_m + 1.19850481987405*rho_wind - 8.57807999976158*n_s + 3.0615 = 0.0000
+          BIC:          -70607.18
+          AIC:          -70657.65
+          R²_ortho:    0.9991
+          Residual std: 0.403892
+          Complexity:   7
+          Components:
+            g1(Omega_m) = 10.7842537067181*Omega_m - 3.71342997771618
+            g2(n_s) = -8.57807999976158*n_s - 17.8109232579718
+            g3(rho_wind) = 1.19850481987405*rho_wind + 27.1215978149183
+
+      [2] 10.7842537067181*Omega_m + 1.19850481987405*rho_wind - 8.57807999976158*n_s + 3.0615 = 0.0000
+          BIC:          -70607.18
+          AIC:          -70657.65
+          R²_ortho:    0.9991
+          Residual std: 0.403892
+          Complexity:   7
+          Components:
+            g1(Omega_m) = 10.7842537067181*Omega_m - 3.71342997771618
+            g2(n_s) = -8.57807999976158*n_s - 17.8109232579718
+            g3(rho_wind) = 1.19850481987405*rho_wind + 27.1215978149183
+
+      [3] 10.7842537067181*Omega_m + 1.19850481987405*rho_wind - 8.57807999976158*n_s + 3.0615 = 0.0000
+          BIC:          -70607.18
+          AIC:          -70657.65
+          R²_ortho:    0.9991
+          Residual std: 0.403892
+          Complexity:   7
+          Components:
+            g1(Omega_m) = 10.7842537067181*Omega_m - 3.71342997771618
+            g2(n_s) = -8.57807999976158*n_s - 17.8109232579718
+            g3(rho_wind) = 1.19850481987405*rho_wind + 27.1215978149183
+
+      [4] 10.7842537067181*Omega_m + 1.19850481987405*rho_wind - 8.57807999976158*n_s + 3.0615 = 0.0000
+          BIC:          -70607.18
+          AIC:          -70657.65
+          R²_ortho:    0.9991
+          Residual std: 0.403892
+          Complexity:   7
+          Components:
+            g1(Omega_m) = 10.7842537067181*Omega_m - 3.71342997771618
+            g2(n_s) = -8.57807999976158*n_s - 17.8109232579718
+            g3(rho_wind) = 1.19850481987405*rho_wind + 27.1215978149183
+
+    #2 top form (1/5 agree):
+      c_1*Omega_m - c_2*n_s + c_3*exp(c_4*rho_wind) + c_5 = 0.0000
+
+      [1] 10.7842537067181*Omega_m - 8.57807999976158*n_s + 0.875984924785291*exp(1.11772846294558*rho_wind) + 2.1958 = 0.0000
+          BIC:          -70592.28
+          AIC:          -70657.17
+          R²_ortho:    0.9991
+          Residual std: 0.403592
+          Complexity:   9
+          Components:
+            g1(Omega_m) = 10.7842537067181*Omega_m - 3.71342997771618
+            g2(n_s) = -8.57807999976158*n_s - 17.8109232579718
+            g3(rho_wind) = 0.875984924785291*exp(1.11772846294558*rho_wind) + 26.255854
+
+[5] Parameters: (Omega_m, rho_wind, chi_qso)
+    MI score: 0.1515
+    Candidates (5 total, 3 distinct form(s)):
+
+    #1 top form (2/5 agree):
+      c_1*Omega_m + c_2*rho_wind - c_3*chi_qso - c_4 = 0.0000
+
+      [1] 4.78975414289978*Omega_m + 0.738240441008568*rho_wind - 31.5648992749245*chi_qso - 1.5016 = 0.0000
+          BIC:          -93668.30
+          AIC:          -93711.56
+          R²_ortho:    0.9999
+          Residual std: 0.294432
+          Complexity:   6
+          Components:
+            g1(Omega_m) = 4.78975414289978*Omega_m - 1.64929508372509
+            g2(rho_wind) = 0.738240441008568*rho_wind - 0.0874521499696636
+            g3(chi_qso) = 0.228864139328775 - 31.5648992749245*chi_qso
+
+      [2] 4.78975414289978*Omega_m + 0.738240441008568*rho_wind - 31.5219950866611*chi_qso - 1.5067 = 0.0000
+          BIC:          -93665.63
+          AIC:          -93708.90
+          R²_ortho:    0.9999
+          Residual std: 0.294142
+          Complexity:   6
+          Components:
+            g1(Omega_m) = 4.78975414289978*Omega_m - 1.64929508372509
+            g2(rho_wind) = 0.738240441008568*rho_wind - 0.0874521499696636
+            g3(chi_qso) = 0.223791106394855 - 31.5219950866611*chi_qso
+
+    #2 top form (1/5 agree):
+      c_1*Omega_m + c_2*exp(-c_3*chi_qso) - c_4*exp(-c_5*rho_wind) - c_6 = 0.0000
+
+      [1] 4.78975414289978*Omega_m + 1.21663223411784*exp(-112.885*chi_qso) - 0.308195247180852*exp(-9.52175*rho_wind) - 2.2258 = 0.0000
+          BIC:          -71854.66
+          AIC:          -71926.76
+          R²_ortho:    0.9992
+          Residual std: 0.349904
+          Complexity:   10
+          Components:
+            g1(Omega_m) = 4.78975414289978*Omega_m - 1.64929508372509
+            g2(rho_wind) = 0.14283507 - 0.308195247180852*exp(-9.52175*rho_wind)
+            g3(chi_qso) = -0.72561 + 1.21663223411784*exp(-112.885*chi_qso)
+
+    #3 top form (2/5 agree):
+      c_1*Omega_m + c_2*rho_wind + c_3*exp(-c_4*chi_qso) - c_5 = 0.0000
+
+      [1] 4.80557772005081*Omega_m + 0.738240441008568*rho_wind + 1.21663223411784*exp(-112.885*chi_qso) - 2.4603 = 0.0000
+          BIC:          -71372.99
+          AIC:          -71430.68
+          R²_ortho:    0.9992
+          Residual std: 0.352927
+          Complexity:   8
+          Components:
+            g1(Omega_m) = 4.80557772005081*Omega_m - 1.65353697000135
+            g2(rho_wind) = 0.738240441008568*rho_wind - 0.0874521499696636
+            g3(chi_qso) = -0.72561 + 1.21663223411784*exp(-112.885*chi_qso)
+
+      [2] 4.78975414289978*Omega_m + 0.734495290491438*rho_wind + 1.21663223411784*exp(-112.885*chi_qso) - 2.4536 = 0.0000
+          BIC:          -71355.24
+          AIC:          -71412.92
+          R²_ortho:    0.9992
+          Residual std: 0.352813
+          Complexity:   8
+          Components:
+            g1(Omega_m) = 4.78975414289978*Omega_m - 1.64929508372509
+            g2(rho_wind) = 0.734495290491438*rho_wind - 0.0849861999890761
+            g3(chi_qso) = -0.72561 + 1.21663223411784*exp(-112.885*chi_qso)
+Total: 5 fits attempted, 5 successful
+--------------------------------------------------------------------------------

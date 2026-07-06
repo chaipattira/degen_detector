@@ -1,0 +1,242 @@
+Computing mutual information matrix...
+Selected 27 parameters: ['log_theta_0', 'log_theta_1', 'log_theta_2', 'log_theta_3', 'log_theta_4', 'log_theta_5', 'log_theta_6', 'log_theta_7', 'log_theta_8', 'log_theta_9', 'log_theta_10', 'log_theta_12', 'log_theta_13', 'log_theta_14', 'log_theta_15', 'log_theta_16', 'log_theta_17', 'log_theta_18', 'log_theta_19', 'log_theta_20', 'log_theta_21', 'log_theta_22', 'log_theta_23', 'log_theta_24', 'log_theta_25', 'log_theta_26', 'log_theta_27']
+Generated 351 2-tuples, ranked by sum MI
+Fitting top 5 of 351 tuples by MI
+Fitting 1/5: ['log_theta_0', 'log_theta_6'] (MI=0.7391)
+Nonlinearity scores: {'log_theta_0': np.float64(0.7803228368757593), 'log_theta_6': np.float64(0.7830691058961895)}
+Fitting order: ['log_theta_6', 'log_theta_0']
+Iteration 1/5
+  Component 0 (log_theta_6): z0*(-0.8815402)
+  Component 1 (log_theta_0): z1*0.77735686
+  Residual std: 0.415914
+Iteration 2/5
+  Component 0 (log_theta_6): z0*(-0.8817724)
+  Component 1 (log_theta_0): z1*0.7774127
+  Residual std: 0.416024
+Iteration 3/5
+  Component 0 (log_theta_6): z0*(-0.8816654)
+  Component 1 (log_theta_0): z1*0.777339
+  Residual std: 0.415973
+Iteration 4/5
+  Component 0 (log_theta_6): z0*(-0.88166416)
+  Component 1 (log_theta_0): z1*0.77739394
+  Residual std: 0.415973
+Iteration 5/5
+  Component 0 (log_theta_6): z0*(-0.8816457)
+  Component 1 (log_theta_0): z1*0.7772572
+  Residual std: 0.415964
+
+Generating top 5 candidate fits from hall of fame...
+  Component 0 alt 1: BIC=-54032.02, AIC=-54068.07, R²_ortho=0.9955
+  Component 0 alt 2: BIC=-54096.65, AIC=-54147.12, R²_ortho=0.9956
+  Component 0 alt 3: BIC=-54049.51, AIC=-54099.98, R²_ortho=0.9955
+  Component 1 alt 1: BIC=-54032.02, AIC=-54068.07, R²_ortho=0.9955
+  Component 1 alt 2: BIC=-54058.18, AIC=-54115.86, R²_ortho=0.9955
+  Component 1 alt 3: BIC=-54141.78, AIC=-54213.89, R²_ortho=0.9956
+
+Returning top 5 fits (consensus form: 2/5 candidates, 4 distinct form(s)):
+  [1] BIC=-54096.65, AIC=-54147.12, R²_ortho=0.9956, residual_std=0.412320
+  [2] BIC=-54049.51, AIC=-54099.98, R²_ortho=0.9955, residual_std=0.412793
+  [3] BIC=-54141.78, AIC=-54213.89, R²_ortho=0.9956, residual_std=0.413952
+  [4] BIC=-54058.18, AIC=-54115.86, R²_ortho=0.9955, residual_std=0.415749
+  [5] BIC=-54032.02, AIC=-54068.07, R²_ortho=0.9955, residual_std=0.415964
+  -> 5 candidates, best BIC = -54096.65 (AIC=-54147.12, R²_ortho=0.9956): 3.71436598128986*log_theta_0 + 4.13903046116695 + (0.203454420767827*log_theta_6 - 0.2512192744207)*(5.64994*log_theta_6 + 17.0106) = -0.0000
+Fitting 2/5: ['log_theta_1', 'log_theta_8'] (MI=0.1230)
+Nonlinearity scores: {'log_theta_1': np.float64(0.21082278864890502), 'log_theta_8': np.float64(0.2094477442442748)}
+Fitting order: ['log_theta_1', 'log_theta_8']
+Iteration 1/5
+  Component 0 (log_theta_1): z0*0.4560613
+  Component 1 (log_theta_8): z1*0.2080101
+  Residual std: 0.405881
+Iteration 2/5
+  Component 0 (log_theta_1): z0*0.4559813
+  Component 1 (log_theta_8): z1*0.20804071
+  Residual std: 0.405809
+Iteration 3/5
+  Component 0 (log_theta_1): z0*0.45613617
+  Component 1 (log_theta_8): z1*0.20794462
+  Residual std: 0.405947
+Iteration 4/5
+  Component 0 (log_theta_1): z0*0.45613763
+  Component 1 (log_theta_8): z1*0.20799854
+  Residual std: 0.405949
+Iteration 5/5
+  Component 0 (log_theta_1): z0*0.45593858
+  Component 1 (log_theta_8): z1*0.20796767
+  Residual std: 0.405771
+
+Generating top 5 candidate fits from hall of fame...
+  Component 0 alt 1: BIC=-52495.22, AIC=-52524.06, R²_ortho=0.9948
+  Component 0 alt 2: BIC=-52418.85, AIC=-52469.33, R²_ortho=0.9947
+  Component 0 alt 3: BIC=-49927.56, AIC=-49999.66, R²_ortho=0.9933
+  Component 1 alt 1: BIC=-52495.22, AIC=-52524.06, R²_ortho=0.9948
+  Component 1 alt 2: BIC=-52729.38, AIC=-52779.86, R²_ortho=0.9949
+  Component 1 alt 3: BIC=-52538.90, AIC=-52611.00, R²_ortho=0.9948
+
+Returning top 5 fits (consensus form: 3/5 candidates, 3 distinct form(s)):
+  [1] BIC=-52495.22, AIC=-52524.06, R²_ortho=0.9948, residual_std=0.405771
+  [2] BIC=-52495.22, AIC=-52524.06, R²_ortho=0.9948, residual_std=0.405771
+  [3] BIC=-52495.22, AIC=-52524.06, R²_ortho=0.9948, residual_std=0.405771
+  [4] BIC=-52729.38, AIC=-52779.86, R²_ortho=0.9949, residual_std=0.405615
+  [5] BIC=-52538.90, AIC=-52611.00, R²_ortho=0.9948, residual_std=0.405418
+  -> 5 candidates, best BIC = -52495.22 (AIC=-52524.06, R²_ortho=0.9948): 4.27851320575554*log_theta_1 + 1.34532950942562 + 3.62931208029507*log_theta_8 + 0.621984530774927 = -0.0000
+Fitting 3/5: ['log_theta_17', 'log_theta_20'] (MI=0.0491)
+Nonlinearity scores: {'log_theta_17': np.float64(0.09486593929406462), 'log_theta_20': np.float64(0.07788416562387412)}
+Fitting order: ['log_theta_17', 'log_theta_20']
+Iteration 1/5
+  Component 0 (log_theta_17): z0*0.26013425
+  Component 1 (log_theta_20): z1*0.06771306
+  Residual std: 0.251176
+Iteration 2/5
+  Component 0 (log_theta_17): z0*0.26044682
+  Component 1 (log_theta_20): z1*0.0677223
+  Residual std: 0.251477
+Iteration 3/5
+  Component 0 (log_theta_17): z0*0.26020715
+  Component 1 (log_theta_20): z1*0.0677817
+  Residual std: 0.251246
+Iteration 4/5
+  Component 0 (log_theta_17): z0*0.2604096
+  Component 1 (log_theta_20): z1*0.067751616
+  Residual std: 0.251441
+Iteration 5/5
+  Component 0 (log_theta_17): z0*0.26015025
+  Component 1 (log_theta_20): z1*0.06761973
+  Residual std: 0.251191
+
+Generating top 5 candidate fits from hall of fame...
+  Component 0 alt 1: BIC=-12574.57, AIC=-12603.41, R²_ortho=0.7167
+  Component 0 alt 2: BIC=-12574.86, AIC=-12603.70, R²_ortho=0.7167
+  Component 0 alt 3: BIC=-11138.14, AIC=-11188.62, R²_ortho=0.6738
+  Component 1 alt 1: BIC=-12574.57, AIC=-12603.41, R²_ortho=0.7167
+  Component 1 alt 2: BIC=-12915.14, AIC=-12965.62, R²_ortho=0.7269
+  Component 1 alt 3: BIC=-13085.32, AIC=-13150.22, R²_ortho=0.7320
+
+Returning top 5 fits (consensus form: 3/5 candidates, 3 distinct form(s)):
+  [1] BIC=-12574.86, AIC=-12603.70, R²_ortho=0.7167, residual_std=0.251170
+  [2] BIC=-12574.57, AIC=-12603.41, R²_ortho=0.7167, residual_std=0.251191
+  [3] BIC=-12574.57, AIC=-12603.41, R²_ortho=0.7167, residual_std=0.251191
+  [4] BIC=-13085.32, AIC=-13150.22, R²_ortho=0.7320, residual_std=0.250035
+  [5] BIC=-12915.14, AIC=-12965.62, R²_ortho=0.7269, residual_std=0.250428
+  -> 5 candidates, best BIC = -12574.86 (AIC=-12603.70, R²_ortho=0.7167): 0.429307414726782*log_theta_17 + 0.52701168076663 + 0.195861667829711*log_theta_20 + 0.116996942062994 = 0.0000
+Fitting 4/5: ['log_theta_6', 'log_theta_24'] (MI=0.0444)
+Nonlinearity scores: {'log_theta_6': np.float64(0.06341464847077805), 'log_theta_24': np.float64(0.08053615566123429)}
+Fitting order: ['log_theta_24', 'log_theta_6']
+Iteration 1/5
+  Component 0 (log_theta_24): z0*0.24916972
+  Component 1 (log_theta_6): z1*0.06215491
+  Residual std: 0.241293
+Iteration 2/5
+  Component 0 (log_theta_24): z0*0.2491249
+  Component 1 (log_theta_6): z1*0.062106147
+  Residual std: 0.241249
+Iteration 3/5
+  Component 0 (log_theta_24): z0*0.2492373
+  Component 1 (log_theta_6): z1*0.062171627
+  Residual std: 0.241358
+Iteration 4/5
+  Component 0 (log_theta_24): z0*0.24918392
+  Component 1 (log_theta_6): z1*0.062105797
+  Residual std: 0.241307
+Iteration 5/5
+  Component 0 (log_theta_24): z0*0.2495499
+  Component 1 (log_theta_6): z1*0.062214993
+  Residual std: 0.241661
+
+Generating top 5 candidate fits from hall of fame...
+  Component 0 alt 1: BIC=-17485.40, AIC=-17514.24, R²_ortho=0.8266
+  Component 0 alt 2: BIC=-17932.59, AIC=-17983.06, R²_ortho=0.8347
+  Component 0 alt 3: BIC=-18162.93, AIC=-18213.40, R²_ortho=0.8384
+  Component 1 alt 1: BIC=-17485.40, AIC=-17514.24, R²_ortho=0.8266
+  Component 1 alt 2: BIC=-17452.91, AIC=-17503.38, R²_ortho=0.8265
+  Component 1 alt 3: BIC=-17304.97, AIC=-17384.29, R²_ortho=0.8246
+
+Returning top 5 fits (consensus form: 3/5 candidates, 2 distinct form(s)):
+  [1] BIC=-17485.40, AIC=-17514.24, R²_ortho=0.8266, residual_std=0.241661
+  [2] BIC=-17485.40, AIC=-17514.24, R²_ortho=0.8266, residual_std=0.241661
+  [3] BIC=-17485.40, AIC=-17514.24, R²_ortho=0.8266, residual_std=0.241661
+  [4] BIC=-18162.93, AIC=-18213.40, R²_ortho=0.8384, residual_std=0.252001
+  [5] BIC=-17932.59, AIC=-17983.06, R²_ortho=0.8347, residual_std=0.254343
+  -> 5 candidates, best BIC = -17485.40 (AIC=-17514.24, R²_ortho=0.8266): 0.35151121574567*log_theta_6 + 1.05831513685375 + 0.461797798600066*log_theta_24 + 1.00901835696573 = 0.0000
+Fitting 5/5: ['log_theta_15', 'log_theta_16'] (MI=0.0418)
+Nonlinearity scores: {'log_theta_15': np.float64(0.0645964477677804), 'log_theta_16': np.float64(0.06154519591455687)}
+Fitting order: ['log_theta_15', 'log_theta_16']
+Iteration 1/5
+  Component 0 (log_theta_15): z0*(-0.24316698)
+  Component 1 (log_theta_16): z1*0.05917126
+  Residual std: 0.235860
+Iteration 2/5
+  Component 0 (log_theta_15): z0*(-0.2431129)
+  Component 1 (log_theta_16): z1*0.059131067
+  Residual std: 0.235808
+Iteration 3/5
+  Component 0 (log_theta_15): z0*(-0.2434229)
+  Component 1 (log_theta_16): z1*0.059249554
+  Residual std: 0.236108
+Iteration 4/5
+  Component 0 (log_theta_15): z0*(-0.24317545)
+  Component 1 (log_theta_16): z1*0.05912212
+  Residual std: 0.235868
+Iteration 5/5
+  Component 0 (log_theta_15): z0*(-0.2434229)
+  Component 1 (log_theta_16): z1*0.059202712
+  Residual std: 0.236108
+
+Generating top 5 candidate fits from hall of fame...
+  Component 0 alt 1: BIC=-6244.63, AIC=-6280.68, R²_ortho=0.4669
+  Component 0 alt 2: BIC=-5988.22, AIC=-6045.90, R²_ortho=0.4546
+  Component 0 alt 3: BIC=-2475.40, AIC=-2540.30, R²_ortho=0.2257
+  Component 1 alt 1: BIC=-6244.63, AIC=-6280.68, R²_ortho=0.4669
+  Component 1 alt 2: BIC=-6422.32, AIC=-6480.01, R²_ortho=0.4777
+  Component 1 alt 3: BIC=-6121.72, AIC=-6201.03, R²_ortho=0.4633
+
+Returning top 5 fits (consensus form: 3/5 candidates, 3 distinct form(s)):
+  [1] BIC=-6244.63, AIC=-6280.68, R²_ortho=0.4669, residual_std=0.236108
+  [2] BIC=-6244.63, AIC=-6280.68, R²_ortho=0.4669, residual_std=0.236108
+  [3] BIC=-6244.63, AIC=-6280.68, R²_ortho=0.4669, residual_std=0.236108
+  [4] BIC=-6422.32, AIC=-6480.01, R²_ortho=0.4777, residual_std=0.235970
+  [5] BIC=-6121.72, AIC=-6201.03, R²_ortho=0.4633, residual_std=0.235839
+  -> 5 candidates, best BIC = -6244.63 (AIC=-6280.68, R²_ortho=0.4669): (-0.23495861857748*log_theta_15 - 0.577197030453753) + 0.222190193047649*log_theta_16 - 1.28635916144206 = -0.0000
+
+================================================================================
+Params                               MI        BIC   R²_ortho  Equation
+================================================================================
+[np.str_('theta_0'), np.str_('theta_6')]   0.7391  -54096.65     0.9956  3.71436598128986*log(theta_0) + 4.13903046116695 + (0.203454420767827*log(theta_6) - 0.2512192744207)*(5.64994*log(theta_6) + 17.0106) = -0.0000
+[np.str_('theta_1'), np.str_('theta_8')]   0.1230  -52495.22     0.9948  4.27851320575554*log(theta_1) + 1.34532950942562 + 3.62931208029507*log(theta_8) + 0.621984530774927 = -0.0000
+[np.str_('theta_17'), np.str_('theta_20')]   0.0491  -12574.86     0.7167  0.429307414726782*log(theta_17) + 0.52701168076663 + 0.195861667829711*log(theta_20) + 0.116996942062994 = 0.0000
+[np.str_('theta_6'), np.str_('theta_24')]   0.0444  -17485.40     0.8266  0.35151121574567*log(theta_6) + 1.05831513685375 + 0.461797798600066*log(theta_24) + 1.00901835696573 = 0.0000
+[np.str_('theta_15'), np.str_('theta_16')]   0.0418   -6244.63     0.4669  (-0.23495861857748*log(theta_15) - 0.577197030453753) + 0.222190193047649*log(theta_16) - 1.28635916144206 = -0.0000
+================================================================================
+
+Processing: unnamed
+  - Equations (all fits)
+  - MI matrix
+  - Corner plot
+  [[np.str_('theta_0'), np.str_('theta_6')]]
+    - Component functions
+    - True vs predicted
+    - Residuals
+    - 2D manifold
+  [[np.str_('theta_1'), np.str_('theta_8')]]
+    - Component functions
+    - True vs predicted
+    - Residuals
+    - 2D manifold
+  [[np.str_('theta_17'), np.str_('theta_20')]]
+    - Component functions
+    - True vs predicted
+    - Residuals
+    - 2D manifold
+  [[np.str_('theta_6'), np.str_('theta_24')]]
+    - Component functions
+    - True vs predicted
+    - Residuals
+    - 2D manifold
+  [[np.str_('theta_15'), np.str_('theta_16')]]
+    - Component functions
+    - True vs predicted
+    - Residuals
+    - 2D manifold
+  Done: /anvil/scratch/x-ctirapongpra/degen_detector/outputs/reproduce/camels_sb28/Mgas/log/depth_2/diagnostics
+
+Diagnostics saved to: /anvil/scratch/x-ctirapongpra/degen_detector/outputs/reproduce/camels_sb28/Mgas/log/depth_2/diagnostics
