@@ -11,11 +11,53 @@ Run from the degen_detector repo root:
 """
 
 import argparse
+import io
 import pickle
 import sys
 from pathlib import Path
 
 import numpy as np
+import torch.nn as nn
+
+
+class _ConvNet(nn.Module):
+    """64-dim CNN embedding for 256×256 maps — must match train.py exactly for pickle."""
+
+    def __init__(self):
+        super().__init__()
+        self.convs = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=8, stride=2, padding=1),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.Conv2d(8, 16, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=4, stride=2),
+            nn.Conv2d(16, 16, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=4, stride=2),
+        )
+        self.fc = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 64),
+        )
+
+    def forward(self, x):
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+        x = self.convs(x)
+        x = x.view(x.size(0), -1)
+        return self.fc(x)
 
 
 def _load_param_names(params_file: Path, sbi_dir: Path) -> list:
@@ -93,8 +135,18 @@ def main():
     print(f"Params ({len(param_names)}): {param_names[:6]}...")
 
     print("\nLoading posterior...")
-    with open(posterior_path, "rb") as f:
-        posterior_ensemble = pickle.load(f)
+    # posterior.pkl is a plain pickle (not torch.save) with CUDA-saved storages.
+    # Patch _load_from_bytes so each storage is remapped to CPU during pickle.load.
+    import torch.storage as _ts
+    _orig_lfb = _ts._load_from_bytes
+    _ts._load_from_bytes = lambda b: torch.load(
+        io.BytesIO(b), map_location="cpu", weights_only=False
+    )
+    try:
+        with open(posterior_path, "rb") as f:
+            posterior_ensemble = pickle.load(f)
+    finally:
+        _ts._load_from_bytes = _orig_lfb
 
     x_obs = np.load(x_obs_path)
     x_obs_tensor = torch.tensor(x_obs[None], dtype=torch.float32)

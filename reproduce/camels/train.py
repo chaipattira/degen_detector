@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import torch.nn as nn
 
 
 def _require(pkg, install_hint):
@@ -54,52 +55,56 @@ def _load_param_names(params_path: Path) -> list:
         return first_line.split()
 
 
+import torch.nn as nn
+
+
+class _ConvNet(nn.Module):
+    """64-dim CNN embedding for 256×256 maps. Must be module-level for pickle."""
+
+    def __init__(self):
+        super().__init__()
+        self.convs = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=8, stride=2, padding=1),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.Conv2d(8, 16, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=4, stride=2),
+            nn.Conv2d(16, 16, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=4, stride=2),
+        )
+        # 256→126→63→30→15→7→2 spatial; 32 channels → 128 flat
+        self.fc = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 64),
+        )
+
+    def forward(self, x):
+        if x.dim() == 3:
+            x = x.unsqueeze(1)  # (B, H, W) → (B, 1, H, W)
+        x = self.convs(x)
+        x = x.view(x.size(0), -1)
+        return self.fc(x)
+
+
 class ConvNet:
     """CNN embedding network — instantiated as a torch nn.Module."""
 
     @staticmethod
     def build():
         """Return the agreed 64-dim embedding network for 256×256 maps."""
-        import torch.nn as nn
-
-        class _ConvNet(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.convs = nn.Sequential(
-                    nn.Conv2d(1, 8, kernel_size=8, stride=2, padding=1),
-                    nn.BatchNorm2d(8),
-                    nn.ReLU(),
-                    nn.Conv2d(8, 16, kernel_size=4, stride=2, padding=1),
-                    nn.BatchNorm2d(16),
-                    nn.ReLU(),
-                    nn.MaxPool2d(kernel_size=4, stride=2),
-                    nn.Conv2d(16, 16, kernel_size=4, stride=2, padding=1),
-                    nn.BatchNorm2d(16),
-                    nn.ReLU(),
-                    nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1),
-                    nn.BatchNorm2d(32),
-                    nn.ReLU(),
-                    nn.MaxPool2d(kernel_size=4, stride=2),
-                )
-                # 256→126→63→30→15→7→2 spatial; 32 channels → 128 flat
-                self.fc = nn.Sequential(
-                    nn.Dropout(p=0.2),
-                    nn.Linear(128, 64),
-                    nn.ReLU(),
-                    nn.Linear(64, 64),
-                    nn.ReLU(),
-                    nn.Linear(64, 32),
-                    nn.ReLU(),
-                    nn.Linear(32, 64),
-                )
-
-            def forward(self, x):
-                if x.dim() == 3:
-                    x = x.unsqueeze(1)  # (B, H, W) → (B, 1, H, W)
-                x = self.convs(x)
-                x = x.view(x.size(0), -1)
-                return self.fc(x)
-
         return _ConvNet()
 
 
@@ -169,8 +174,8 @@ def main():
 
     mask = np.ones(len(maps), dtype=bool)
     mask[obs_start:obs_end] = False
-    x_train = maps[mask].astype(np.float32)         # (30720-15, 256, 256)
-    theta_train = theta_rep[mask].astype(np.float32) # (30720-15, 28)
+    x_train = maps[mask][::2].astype(np.float32)
+    theta_train = theta_rep[mask][::2].astype(np.float32)
 
     print(f"\nTraining set: {x_train.shape[0]} maps, {theta_train.shape[1]} params")
     print(f"Observation:  {x_obs.shape} (sim index {args.obs_idx})")

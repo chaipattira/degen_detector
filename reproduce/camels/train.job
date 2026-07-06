@@ -2,11 +2,13 @@
 #SBATCH --job-name=camels-train           # Job name
 #SBATCH --nodes=1                         # Number of nodes
 #SBATCH --ntasks=1                        # Number of tasks
-#SBATCH --cpus-per-task=4                # CPUs per task
-#SBATCH --mem=128G                        # maps_raw + maps + x_train peak ~24 GB
-#SBATCH --time=2:00:00                  # Time limit
-#SBATCH --partition=shared               # Partition name
-#SBATCH --account=phy240043              # Account name
+#SBATCH --cpus-per-task=16                # CPUs per task
+#SBATCH --mem=150G                        # maps_raw + maps + x_train peak ~24 GB
+#SBATCH --time=1:00:00                    # Time limit (~1 hr expected on GPU)
+#SBATCH --partition=gpu                   # Partition name
+#SBATCH --gres=gpu:1                      # 1 GPU per task
+#SBATCH --account=phy240043-gpu           # GPU account
+#SBATCH --qos=gpu                         # GPU QOS
 #SBATCH --array=0-2                      # 3 tasks: Mcdm, Mgas, Mstar
 #SBATCH --output=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
 #SBATCH --error=/anvil/scratch/x-ctirapongpra/jobout/%x_%A_%a.out
@@ -34,7 +36,7 @@ uv run --project "${PROJECT_DIR}" python "${CAMELS_DIR}/train.py" \
     --field "${FIELD}" \
     --data-dir "${DATA_DIR}" \
     --out-dir "${OUT_DIR}" \
-    --device cpu
+    --device cuda
 
 echo "${FIELD} training complete"
 echo "End: $(date)"

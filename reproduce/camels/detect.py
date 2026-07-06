@@ -84,9 +84,20 @@ def main():
         print(f"\n{'='*60}")
         print(f"Running degen_detector: {mode_name} mode → {out_dir}")
         print(f"{'='*60}")
+
+        run_samples = samples
+        run_param_names = param_names
+        if log_mode:
+            keep = [i for i in range(len(param_names)) if samples[:, i].min() > 0]
+            excluded = [param_names[i] for i in range(len(param_names)) if i not in keep]
+            if excluded:
+                print(f"  Log mode: excluding params with non-positive values: {excluded}")
+                run_samples = samples[:, keep]
+                run_param_names = [param_names[i] for i in keep]
+
         run_detector(
-            samples,
-            param_names,
+            run_samples,
+            run_param_names,
             output_dir=out_dir,
             log_mode=log_mode,
             **run_kwargs,
